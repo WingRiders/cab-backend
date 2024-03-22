@@ -1,9 +1,17 @@
 {
   "name": "cab-backend",
   "module": "src/index.ts",
-  "type": "module",
   "devDependencies": {
+    "@biomejs/biome": "1.6.2",
     "@types/bun": "latest",
     "typescript": "^5.0.0"
-  }
+  },
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "lint": "bun biome check src && tsc --noEmit",
+    "fix": "bun biome check --apply src",
+    "start": "NODE_ENV=production bun src/index.ts",
+    "test": "bun test"
+  },
+  "type": "module"
 }
