@@ -15,10 +15,13 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@cardano-ogmios/client": "^6.1.0",
+    "@sinclair/typebox": "^0.32.18",
     "elysia": "^1.0.7"
   },
   "devDependencies": {
     "@biomejs/biome": "1.6.2",
+    "@cardano-ogmios/schema": "^6.1.0",
     "@elysiajs/eden": "^1.0.5",
     "@types/bun": "latest",
     "typescript": "^5.0.0"
