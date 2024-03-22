@@ -1,11 +1,12 @@
 {
   "name": "cab-backend",
+  "description": "Open-source light-weight backend to CAB",
+  "repository": "git@github.com:WingRiders/cab-backend.git",
+  "version": "0.1.0",
+  "type": "module",
   "module": "src/index.ts",
-  "devDependencies": {
-    "@biomejs/biome": "1.6.2",
-    "@types/bun": "latest",
-    "typescript": "^5.0.0"
-  },
+  "author": "TechRiderWR <techrider@wingriders.com>",
+  "license": "MIT",
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "lint": "bun biome check src && tsc --noEmit",
@@ -13,5 +14,13 @@
     "start": "NODE_ENV=production bun src/index.ts",
     "test": "bun test"
   },
-  "type": "module"
+  "dependencies": {
+    "elysia": "^1.0.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.6.2",
+    "@elysiajs/eden": "^1.0.5",
+    "@types/bun": "latest",
+    "typescript": "^5.0.0"
+  }
 }

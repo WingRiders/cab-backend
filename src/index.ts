@@ -1,4 +1,5 @@
-Bun.serve({
-	port: process.env.PORT || 3000,
-	fetch: (_, __) => new Response('Hello World!'),
-})
+import {Elysia} from 'elysia'
+
+export const app = new Elysia()
+	.get('/healthcheck', () => ({healthy: true, uptime: process.uptime()}))
+	.listen(process.env.PORT || 3000)
