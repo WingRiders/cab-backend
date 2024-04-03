@@ -1,28 +1,34 @@
 import {Elysia, t} from 'elysia'
+import JSONbig from 'json-bigint'
 import {config} from './config'
-import {getUTxOs} from './ogmios'
+import {getUTxOs, protocolParameters, rewardAccountSummary} from './ogmios/ledgerStateQuery'
+
+const {stringify} = JSONbig({useNativeBigInt: true})
 
 export const app = new Elysia()
-	// Transform query parameters with `,` to an array
-	.derive(({query}) => ({
-		query: Object.fromEntries(
-			Object.entries(query).map(([k, v]) => [k, v?.includes(',') ? v?.split(',') : v]),
-		),
-	}))
+	// Handle encoding of bigints returned by Ogmios
+	.mapResponse(({response}) => {
+		if (typeof response === 'object') {
+			return new Response(stringify(response), {headers: {'Content-Type': 'application/json'}})
+		}
+	})
 
 	// Get health of the service
 	.get('/healthcheck', () => ({healthy: true, uptime: process.uptime()}))
 
 	// Get UTxOs for given addresses, optionally tied to a specific slot
-	.get('/utxos', ({query}) => getUTxOs(query), {
-		query: t.Object({addresses: t.Array(t.String())}),
+	// POST is not correct in terms of REST, but easier to handle array params
+	.post('/utxos', ({body: {addresses}}) => getUTxOs({addresses}), {
+		body: t.Object({addresses: t.Array(t.String())}),
 	})
 
 	// Get stake key info - rewards, delegated, stake pool id
-	.get('/rewardAccountSummary/:stakeKeyHash', ({params: stakeKeyHash}) => 'TODO')
+	.get('/rewardAccountSummary/:stakeKeyHash', ({params: {stakeKeyHash}}) =>
+		rewardAccountSummary(stakeKeyHash),
+	)
 
-	// Get protocol params - can be cached for whole epoch / or till a protocol params tx is onchain
-	.get('/protocolParameters', () => 'TODO')
+	// Get protocol params - cached for whole epoch
+	.get('/protocolParameters', () => protocolParameters())
 
 	// Gets list of used addresses for given stakeKeyHash
 	.get('/addresses/:stakeKeyHash', ({params: {stakeKeyHash}}) => 'TODO')
