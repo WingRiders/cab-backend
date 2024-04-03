@@ -8,7 +8,7 @@ import {getContext} from './ogmios'
 
 // Aggregation logic is here
 const processBlock = async (block: BlockPraos) => {
-	blockBuffer.push({slot: block.slot, hash: block.id})
+	blockBuffer.push({slot: block.slot, hash: Buffer.from(block.id, 'hex')})
 }
 
 const processRollback = async (point: 'origin' | Point) => {
@@ -29,9 +29,9 @@ const writeBufferIfNecessary = async (threshold = bufferSize) => {
 	if (blockBuffer.length >= threshold) {
 		// Inserting data with unnest ensures that the query is stable and reduces the
 		// amount of time it takes to parse the query.
-		await sql`INSERT INTO blocks (slot, hash) SELECT * FROM unnest(${blockBuffer.map(
+		await sql`INSERT INTO block (slot, hash) SELECT * FROM unnest(${blockBuffer.map(
 			({slot}) => slot,
-		)}::integer[], ${blockBuffer.map(({hash}) => hash)}::varchar(64)[])`
+		)}::integer[], ${sql.array(blockBuffer.map(({hash}) => hash))}::bytea[])`
 		logger.debug(`Inserted ${blockBuffer.length} blocks into DB`)
 
 		blockBuffer = []
@@ -42,7 +42,7 @@ const writeBufferIfNecessary = async (threshold = bufferSize) => {
 // rollbacks) or default to origin
 const findIntersect = async () => {
 	const dbBlock = await db.query.blocks.findFirst({orderBy: [desc(blocks.slot)], offset: 10})
-	return dbBlock ? {id: dbBlock.hash, slot: dbBlock.slot} : 'origin'
+	return dbBlock ? {id: dbBlock.hash.toString('hex'), slot: dbBlock.slot} : 'origin'
 }
 
 // Start the chain sync client, and add a listener on the underlying socket - connection to Ogmios

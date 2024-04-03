@@ -1,11 +1,11 @@
 {
-  "id": "ac81464b-19bc-452a-9fd0-3a7073535997",
+  "id": "d4bdb93a-c9dc-4ed5-b3c5-1def58c64458",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "5",
   "dialect": "pg",
   "tables": {
-    "blocks": {
-      "name": "blocks",
+    "block": {
+      "name": "block",
       "schema": "",
       "columns": {
         "slot": {
@@ -16,7 +16,7 @@
         },
         "hash": {
           "name": "hash",
-          "type": "varchar(64)",
+          "type": "bytea",
           "primaryKey": false,
           "notNull": true
         }
