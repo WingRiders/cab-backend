@@ -1,18 +1,28 @@
 import {createChainSynchronizationClient} from '@cardano-ogmios/client'
-import type {BlockPraos} from '@cardano-ogmios/schema'
+import type {BlockPraos, Point} from '@cardano-ogmios/schema'
 import {desc, gte} from 'drizzle-orm'
 import {db, sql} from '../db/db'
 import {type NewBlock, blocks} from '../db/schema'
 import {logger} from '../logger'
 import {getContext} from './ogmios'
 
-// Buffering is suitable when doing the initial sync
-const bufferSize = 1000
-let blockBuffer: NewBlock[] = []
-
+// Aggregation logic is here
 const processBlock = async (block: BlockPraos) => {
 	blockBuffer.push({slot: block.slot, hash: block.id})
 }
+
+const processRollback = async (point: 'origin' | Point) => {
+	if (point === 'origin') {
+		await db.delete(blocks)
+	} else {
+		await db.delete(blocks).where(gte(blocks.slot, point.slot))
+	}
+}
+
+// Aggregation framework below
+// Buffering is suitable when doing the initial sync
+const bufferSize = 1000
+let blockBuffer: NewBlock[] = []
 
 // Write buffer of blocks into DB
 const writeBufferIfNecessary = async (threshold = bufferSize) => {
@@ -64,17 +74,14 @@ export const startChainSyncClient = async () => {
 
 		async rollBackward(response, nextBlock) {
 			logger.trace({point: response.point}, 'Roll backward')
-			if (response.point === 'origin') {
-				await db.delete(blocks)
-			} else {
-				await db.delete(blocks).where(gte(blocks.slot, response.point.slot))
-			}
+			await processRollback(response.point)
 			nextBlock()
 		},
 	})
 
-	// Start the chain sync client from the origin, roll forward skips byron blocks
+	// Start the chain sync client from the latest intersect, and rollback to it first
 	const intersect = await findIntersect()
+	processRollback(intersect)
 	logger.info({intersect}, 'Ogmios - resuming chainSyncClient')
 	await chainSyncClient.resume([intersect], bufferSize)
 
