@@ -11,7 +11,11 @@ export const blocks = pgTable('block', {
 
 export type NewBlock = typeof blocks.$inferInsert
 
-// export const transactions = pgTable('transaction', {
-// 	txHash: varchar('tx_hash', {length: 64}).primaryKey(),
-// 	slot: integer('slot').notNull(),
-// })
+export const transactions = pgTable('transaction', {
+	txHash: bytea('tx_hash').primaryKey(),
+	slot: integer('slot')
+		.notNull()
+		.references(() => blocks.slot, {onDelete: 'cascade'}),
+})
+
+export type NewTx = typeof transactions.$inferInsert
