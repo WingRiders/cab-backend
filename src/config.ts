@@ -6,6 +6,12 @@ const Env = Type.Object({
 	LOG_LEVEL: Type.String({default: 'debug'}),
 	OGMIOS_HOST: Type.String({default: 'localhost'}),
 	OGMIOS_PORT: Type.Number({default: 1337}),
+	DB_HOST: Type.String(),
+	DB_PORT: Type.Number({default: 5432}),
+	DB_USER: Type.String(),
+	DB_PASSWORD: Type.String(),
+	DB_NAME: Type.String(),
+	DB_SCHEMA: Type.String({default: 'cab_backend'}),
 })
 
 const defaultedEnv = Value.Cast(Env, Value.Convert(Env, process.env))

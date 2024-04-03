@@ -1,8 +1,8 @@
 import {Elysia, t} from 'elysia'
 import JSONbig from 'json-bigint'
 import {config} from './config'
-import {getUTxOs, protocolParameters, rewardAccountSummary} from './ogmios/ledgerStateQuery'
 import {startChainSyncClient} from './ogmios/chainSync'
+import {getUTxOs, protocolParameters, rewardAccountSummary} from './ogmios/ledgerStateQuery'
 
 const {stringify} = JSONbig({useNativeBigInt: true})
 
