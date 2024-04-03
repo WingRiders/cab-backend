@@ -1,8 +1,8 @@
 import {expect, describe, it} from 'bun:test'
 import {treaty} from '@elysiajs/eden'
-import {app} from '../src'
+import {app} from '../src/server'
 
-const api = treaty(app)
+const api = treaty(app.listen(3000))
 
 describe('Server', () => {
 	it('returns a healthcheck response', async () => {
