@@ -2,9 +2,11 @@ import {Elysia, t} from 'elysia'
 import JSONbig from 'json-bigint'
 import {config} from './config'
 import {getUTxOs, protocolParameters, rewardAccountSummary} from './ogmios/ledgerStateQuery'
+import {startChainSyncClient} from './ogmios/chainSync'
 
 const {stringify} = JSONbig({useNativeBigInt: true})
 
+// Start the HTTP server
 export const app = new Elysia()
 	// Handle encoding of bigints returned by Ogmios
 	.mapResponse(({response}) => {
@@ -41,3 +43,6 @@ export const app = new Elysia()
 
 	// Listen on configured port, defaults to 3000
 	.listen(config.PORT)
+
+// Start the Ogmios chain synchornization client
+startChainSyncClient()

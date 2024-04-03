@@ -18,7 +18,8 @@
     "@cardano-ogmios/client": "^6.1.0",
     "@sinclair/typebox": "^0.32.18",
     "elysia": "^1.0.7",
-    "json-bigint": "^1.0.0"
+    "json-bigint": "^1.0.0",
+    "pino": "^8.19.0"
   },
   "devDependencies": {
     "@biomejs/biome": "1.6.2",
