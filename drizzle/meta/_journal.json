@@ -15,6 +15,13 @@
       "when": 1712164009197,
       "tag": "0001_short_jazinda",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1712265611179,
+      "tag": "0002_cold_nomad",
+      "breakpoints": true
     }
   ]
 }

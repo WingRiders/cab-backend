@@ -18,6 +18,7 @@
   "dependencies": {
     "@cardano-ogmios/client": "^6.1.0",
     "@sinclair/typebox": "^0.32.18",
+    "bech32": "^2.0.0",
     "drizzle-orm": "^0.30.6",
     "elysia": "^1.0.7",
     "json-bigint": "^1.0.0",

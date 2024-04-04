@@ -1,17 +1,30 @@
 import {createChainSynchronizationClient} from '@cardano-ogmios/client'
 import type {BlockPraos, Point} from '@cardano-ogmios/schema'
+import {bech32} from 'bech32'
 import {desc, gte} from 'drizzle-orm'
 import {db, sql} from '../db/db'
-import {type NewBlock, blocks, type NewTx} from '../db/schema'
+import {type NewAddress, type NewBlock, type NewTx, blocks} from '../db/schema'
 import {logger} from '../logger'
 import {getContext} from './ogmios'
 
 // Aggregation logic is here
 const processBlock = async (block: BlockPraos) => {
 	blockBuffer.push({slot: block.slot, hash: Buffer.from(block.id, 'hex')})
+
+	const txHashes = block.transactions?.map((tx) => tx.id) || []
 	txBuffer.push(
-		...(block.transactions?.map((tx) => ({txHash: Buffer.from(tx.id, 'hex'), slot: block.slot})) ||
-			[]),
+		...txHashes.map<NewTx>((txHash) => ({txHash: Buffer.from(txHash, 'hex'), slot: block.slot})),
+	)
+
+	// Shelley addresses - bech32 with prefix starting with addr/addr_test
+	const addresses = (
+		block.transactions?.flatMap((tx) => tx.outputs.map((output) => output.address)) || []
+	).filter((address) => address.startsWith('addr'))
+	addressBuffer.push(
+		...addresses.map<NewAddress>((address) => ({
+			address: Buffer.from(bech32.fromWords(bech32.decode(address, 114).words)),
+			firstSlot: block.slot,
+		})),
 	)
 }
 
@@ -25,32 +38,49 @@ const processRollback = async (point: 'origin' | Point) => {
 
 // Aggregation framework below
 // Buffering is suitable when doing the initial sync
-const bufferSize = 1000
+const bufferSize = 10_000
 let blockBuffer: NewBlock[] = []
 let txBuffer: NewTx[] = []
+let addressBuffer: NewAddress[] = []
 
 // Write buffers into DB
 const writeBuffersIfNecessary = async (threshold = bufferSize) => {
 	// If one buffer is being written others must as well as they might depend on each other
 	// For example block determines in case of restarts the intersect for resuming
 	// chain sync. If block buffer was written but other data not, it could get lost forever.
-	if (blockBuffer.length >= threshold || txBuffer.length >= threshold) {
+	if (
+		blockBuffer.length >= threshold ||
+		txBuffer.length >= threshold ||
+		addressBuffer.length >= threshold
+	) {
 		// Inserting data with unnest ensures that the query is stable and reduces the
 		// amount of time it takes to parse the query.
-		await sql.begin((sql) => [
-			sql`INSERT INTO block (slot, hash) SELECT * FROM unnest(${sql.array(
-				blockBuffer.map(({slot}) => slot),
-			)}::integer[], ${sql.array(blockBuffer.map(({hash}) => hash))}::bytea[])`,
-			sql`INSERT INTO transaction (tx_hash, slot) SELECT * FROM unnest(${sql.array(
-				txBuffer.map(({txHash}) => txHash),
-			)}::bytea[], ${sql.array(txBuffer.map(({slot}) => slot))}::integer[])`,
-		])
+		await sql.begin((sql) =>
+			[
+				sql`INSERT INTO block (slot, hash) SELECT * FROM unnest(${sql.array(
+					blockBuffer.map(({slot}) => slot),
+				)}::integer[], ${sql.array(blockBuffer.map(({hash}) => hash))}::bytea[])`,
+				txBuffer.length > 0 &&
+					sql`INSERT INTO transaction (tx_hash, slot) SELECT * FROM unnest(${sql.array(
+						txBuffer.map(({txHash}) => txHash),
+					)}::bytea[], ${sql.array(txBuffer.map(({slot}) => slot))}::integer[])`,
+				// Addresses might repeat, so `ON CONFLICT DO NOTHING` skips any duplicates and keeps
+				// the first address only in the DB
+				addressBuffer.length > 0 &&
+					sql`INSERT INTO address (address, slot) SELECT * FROM unnest(${sql.array(
+						addressBuffer.map(({address}) => address),
+					)}::bytea[], ${sql.array(addressBuffer.map(({firstSlot}) => firstSlot))}::integer[])
+					ON CONFLICT DO NOTHING`,
+			].filter((insert) => insert !== false),
+		)
 
 		logger.debug(`Inserted ${blockBuffer.length} blocks into DB`)
 		logger.debug(`Inserted ${txBuffer.length} transactions into DB`)
+		logger.debug(`Inserted ${addressBuffer.length} addresses into DB`)
 
 		blockBuffer = []
 		txBuffer = []
+		addressBuffer = []
 	}
 }
 
@@ -68,6 +98,7 @@ export const startChainSyncClient = async () => {
 	// data and prevent double writes
 	blockBuffer = []
 	txBuffer = []
+	addressBuffer = []
 
 	const context = await getContext()
 
@@ -100,7 +131,7 @@ export const startChainSyncClient = async () => {
 	const intersect = await findIntersect()
 	processRollback(intersect)
 	logger.info({intersect}, 'Ogmios - resuming chainSyncClient')
-	await chainSyncClient.resume([intersect], bufferSize)
+	await chainSyncClient.resume([intersect], 100)
 
 	// Restart chainSyncClient on context close
 	context.socket.addEventListener('close', () => startChainSyncClient())
