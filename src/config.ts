@@ -3,10 +3,10 @@ import {Value} from '@sinclair/typebox/value'
 
 const Env = Type.Object({
 	PORT: Type.Number({default: 3000}),
-	LOG_LEVEL: Type.String({default: 'debug'}),
+	LOG_LEVEL: Type.String({default: 'info'}),
 	OGMIOS_HOST: Type.String({default: 'localhost'}),
 	OGMIOS_PORT: Type.Number({default: 1337}),
-	DB_HOST: Type.String(),
+	DB_HOST: Type.String({default: 'localhost'}),
 	DB_PORT: Type.Number({default: 5432}),
 	DB_USER: Type.String(),
 	DB_PASSWORD: Type.String(),

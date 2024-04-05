@@ -1,10 +1,10 @@
-import {Elysia, t} from 'elysia'
+import {Elysia, mapResponse, t} from 'elysia'
 import JSONbig from 'json-bigint'
 import {
 	getUTxOs,
 	getLedgerTip,
 	protocolParameters,
-	rewardAccountSummary,
+	getRewardAccountSummary,
 	getNetworkTip,
 } from './ogmios/ledgerStateQuery'
 import {addressesByStakeKeyHash, getLastBlock, transactionByTxHash} from './db/db'
@@ -12,6 +12,21 @@ import {addressesByStakeKeyHash, getLastBlock, transactionByTxHash} from './db/d
 const {stringify} = JSONbig({useNativeBigInt: true})
 
 export const app = new Elysia()
+	// Handle encoding of bigints returned by Ogmios and encode Buffers as hex strings
+	.mapResponse(({response, set}) => {
+		if (typeof response === 'object') {
+			return mapResponse(
+				stringify(response, (_, v) =>
+					typeof v === 'object' && v.type === 'Buffer' ? Buffer.from(v.data).toString('hex') : v,
+				),
+				{...set, headers: {'Content-Type': 'application/json'}},
+			)
+		}
+	})
+
+	// Get protocol params - cached for whole epoch
+	.get('/protocolParameters', () => protocolParameters())
+
 	// Get UTxOs for given addresses, optionally tied to a specific slot
 	// POST is not correct in terms of REST, but easier to handle array params
 	.post('/utxos', ({body: {addresses}}) => getUTxOs({addresses}), {
@@ -19,15 +34,17 @@ export const app = new Elysia()
 	})
 
 	// Get stake key info - rewards, delegated, stake pool id
-	.get('/rewardAccountSummary/:stakeKeyHash', ({params: {stakeKeyHash}}) =>
-		rewardAccountSummary(stakeKeyHash),
-	)
-
-	// Get protocol params - cached for whole epoch
-	.get('/protocolParameters', () => protocolParameters())
+	.get('/rewardAccountSummary/:stakeKeyHash', async ({params: {stakeKeyHash}, set}) => {
+		const rewardAccountSummary = (await getRewardAccountSummary(stakeKeyHash))[stakeKeyHash]
+		if (!rewardAccountSummary) {
+			set.status = 404
+			return {msg: 'Stake key not found, or the stake key is not registered'}
+		}
+		return rewardAccountSummary
+	})
 
 	// Gets list of used addresses for given stakeKeyHash
-	.get('/addresses/:stakeKeyHash', ({params: {stakeKeyHash}}) =>
+	.get('/addresses/:stakeKeyHash', async ({params: {stakeKeyHash}}) =>
 		addressesByStakeKeyHash(stakeKeyHash),
 	)
 
@@ -36,7 +53,7 @@ export const app = new Elysia()
 		const transaction = await transactionByTxHash(txHash)
 		if (!transaction) {
 			set.status = 404
-			return 'Not Found'
+			return {msg: 'Transaction not found'}
 		}
 		return transaction
 	})
@@ -63,17 +80,5 @@ export const app = new Elysia()
 			ledgerSlot,
 			lastBlockSlot,
 			uptime: process.uptime(),
-		}
-	})
-
-	// Handle encoding of bigints returned by Ogmios and encode Buffers as hex strings
-	.mapResponse(({response}) => {
-		if (typeof response === 'object') {
-			return new Response(
-				stringify(response, (_, v) =>
-					typeof v === 'object' && v.type === 'Buffer' ? Buffer.from(v.data).toString('hex') : v,
-				),
-				{headers: {'Content-Type': 'application/json'}},
-			)
 		}
 	})

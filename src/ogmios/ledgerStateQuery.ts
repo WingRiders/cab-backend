@@ -18,7 +18,7 @@ export const getUTxOs = async (
 	return client.utxo(filter)
 }
 
-export const rewardAccountSummary = async (stakeKeyHash: string) => {
+export const getRewardAccountSummary = async (stakeKeyHash: string) => {
 	const client = await getLedgerStateQueryClient()
 	return client.rewardAccountSummaries({keys: [stakeKeyHash]})
 }
