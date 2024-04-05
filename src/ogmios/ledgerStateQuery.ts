@@ -38,3 +38,13 @@ export const protocolParameters = async () => {
 
 	return cachedProtocolParams.protocolParams
 }
+
+export const getNetworkTip = async () => {
+	const client = await getLedgerStateQueryClient()
+	return client.networkTip()
+}
+
+export const getLedgerTip = async () => {
+	const client = await getLedgerStateQueryClient()
+	return client.networkTip()
+}
