@@ -28,13 +28,8 @@ const processBlock = async (block: BlockPraos) => {
 	)
 }
 
-const processRollback = async (point: 'origin' | Point) => {
-	if (point === 'origin') {
-		await db.delete(blocks)
-	} else {
-		await db.delete(blocks).where(gte(blocks.slot, point.slot))
-	}
-}
+const processRollback = (point: 'origin' | Point) =>
+	point === 'origin' ? db.delete(blocks) : db.delete(blocks).where(gte(blocks.slot, point.slot))
 
 // Aggregation framework below
 // Buffering is suitable when doing the initial sync
@@ -53,30 +48,36 @@ const writeBuffersIfNecessary = async (threshold = bufferSize) => {
 		txBuffer.length >= threshold ||
 		addressBuffer.length >= threshold
 	) {
-		// Inserting data with unnest ensures that the query is stable and reduces the
-		// amount of time it takes to parse the query.
-		await sql.begin((sql) =>
-			[
-				sql`INSERT INTO block (slot, hash) SELECT * FROM unnest(${sql.array(
-					blockBuffer.map(({slot}) => slot),
-				)}::integer[], ${sql.array(blockBuffer.map(({hash}) => hash))}::bytea[])`,
-				txBuffer.length > 0 &&
-					sql`INSERT INTO transaction (tx_hash, slot) SELECT * FROM unnest(${sql.array(
+		// Do the inserts in one transaction to ensure data doesn't get corrupted if the
+		// execution fails somewhere
+		await sql.begin(async (sql) => {
+			const counts = {blocks: 0, transactions: 0, addresses: 0}
+			// Inserting data with unnest ensures that the query is stable and reduces the
+			// amount of time it takes to parse the query.
+			const blocks = await sql`INSERT INTO block (slot, hash) SELECT * FROM unnest(${sql.array(
+				blockBuffer.map(({slot}) => slot),
+			)}::integer[], ${sql.array(blockBuffer.map(({hash}) => hash))}::bytea[])`
+			counts.blocks = blocks.count
+
+			if (txBuffer.length > 0) {
+				const txs =
+					await sql`INSERT INTO transaction (tx_hash, slot) SELECT * FROM unnest(${sql.array(
 						txBuffer.map(({txHash}) => txHash),
-					)}::bytea[], ${sql.array(txBuffer.map(({slot}) => slot))}::integer[])`,
+					)}::bytea[], ${sql.array(txBuffer.map(({slot}) => slot))}::integer[])`
+				counts.transactions = txs.count
+
 				// Addresses might repeat, so `ON CONFLICT DO NOTHING` skips any duplicates and keeps
 				// the first address only in the DB
-				addressBuffer.length > 0 &&
-					sql`INSERT INTO address (address, slot) SELECT * FROM unnest(${sql.array(
+				const addresses =
+					await sql`INSERT INTO address (address, slot) SELECT * FROM unnest(${sql.array(
 						addressBuffer.map(({address}) => address),
 					)}::bytea[], ${sql.array(addressBuffer.map(({firstSlot}) => firstSlot))}::integer[])
-					ON CONFLICT DO NOTHING`,
-			].filter((insert) => insert !== false),
-		)
+					ON CONFLICT DO NOTHING`
+				counts.addresses = addresses.count
+			}
 
-		logger.debug(`Inserted ${blockBuffer.length} blocks into DB`)
-		logger.debug(`Inserted ${txBuffer.length} transactions into DB`)
-		logger.debug(`Inserted ${addressBuffer.length} addresses into DB`)
+			logger.debug(counts, 'Wrote buffers to DB')
+		})
 
 		blockBuffer = []
 		txBuffer = []
