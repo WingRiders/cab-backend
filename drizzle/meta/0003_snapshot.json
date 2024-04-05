@@ -1,0 +1,125 @@
+{
+  "id": "1937acc1-a7cc-4f8d-8cda-4642004dfd83",
+  "prevId": "edac2840-2cef-4bd0-a251-3dd568141805",
+  "version": "5",
+  "dialect": "pg",
+  "tables": {
+    "address": {
+      "name": "address",
+      "schema": "",
+      "columns": {
+        "address": {
+          "name": "address",
+          "type": "bytea",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "first_slot": {
+          "name": "first_slot",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "first_slot_idx": {
+          "name": "first_slot_idx",
+          "columns": [
+            "first_slot"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "address_first_slot_block_slot_fk": {
+          "name": "address_first_slot_block_slot_fk",
+          "tableFrom": "address",
+          "tableTo": "block",
+          "columnsFrom": [
+            "first_slot"
+          ],
+          "columnsTo": [
+            "slot"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "block": {
+      "name": "block",
+      "schema": "",
+      "columns": {
+        "slot": {
+          "name": "slot",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "hash": {
+          "name": "hash",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "transaction": {
+      "name": "transaction",
+      "schema": "",
+      "columns": {
+        "tx_hash": {
+          "name": "tx_hash",
+          "type": "bytea",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "slot": {
+          "name": "slot",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "slot_idx": {
+          "name": "slot_idx",
+          "columns": [
+            "slot"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "transaction_slot_block_slot_fk": {
+          "name": "transaction_slot_block_slot_fk",
+          "tableFrom": "transaction",
+          "tableTo": "block",
+          "columnsFrom": [
+            "slot"
+          ],
+          "columnsTo": [
+            "slot"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

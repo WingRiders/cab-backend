@@ -22,6 +22,13 @@
       "when": 1712265611179,
       "tag": "0002_cold_nomad",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1712312208504,
+      "tag": "0003_narrow_spiral",
+      "breakpoints": true
     }
   ]
 }

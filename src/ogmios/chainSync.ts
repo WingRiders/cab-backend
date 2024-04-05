@@ -69,7 +69,7 @@ const writeBuffersIfNecessary = async (threshold = bufferSize) => {
 				// Addresses might repeat, so `ON CONFLICT DO NOTHING` skips any duplicates and keeps
 				// the first address only in the DB
 				const addresses =
-					await sql`INSERT INTO address (address, slot) SELECT * FROM unnest(${sql.array(
+					await sql`INSERT INTO address (address, first_slot) SELECT * FROM unnest(${sql.array(
 						addressBuffer.map(({address}) => address),
 					)}::bytea[], ${sql.array(addressBuffer.map(({firstSlot}) => firstSlot))}::integer[])
 					ON CONFLICT DO NOTHING`
@@ -130,7 +130,7 @@ export const startChainSyncClient = async () => {
 
 	// Start the chain sync client from the latest intersect, and rollback to it first
 	const intersect = await findIntersect()
-	processRollback(intersect)
+	await processRollback(intersect)
 	logger.info({intersect}, 'Ogmios - resuming chainSyncClient')
 	await chainSyncClient.resume([intersect], 100)
 
