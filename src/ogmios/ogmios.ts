@@ -27,3 +27,8 @@ export const getContext = async () => {
 
 	return context
 }
+
+export const withClient =
+	<C>(clientPromise: () => Promise<C>) =>
+	async <R>(f: (client: C) => Promise<R>): Promise<R> =>
+		f(await clientPromise())

@@ -1,6 +1,6 @@
 import {createLedgerStateQueryClient} from '@cardano-ogmios/client'
 import type {Address, ProtocolParameters, TransactionOutputReference} from '@cardano-ogmios/schema'
-import {getContext} from './ogmios'
+import {getContext, withClient} from './ogmios'
 
 let ledgerStateQueryClient: Awaited<ReturnType<typeof createLedgerStateQueryClient>> | undefined
 const getLedgerStateQueryClient = async () => {
@@ -11,17 +11,14 @@ const getLedgerStateQueryClient = async () => {
 	return ledgerStateQueryClient
 }
 
+const queryClient = withClient(getLedgerStateQueryClient)
+
 export const getUTxOs = async (
 	filter: {addresses: Address[]} | {outputReferences: TransactionOutputReference[]},
-) => {
-	const client = await getLedgerStateQueryClient()
-	return client.utxo(filter)
-}
+) => queryClient((q) => q.utxo(filter))
 
-export const getRewardAccountSummary = async (stakeKeyHash: string) => {
-	const client = await getLedgerStateQueryClient()
-	return client.rewardAccountSummaries({keys: [stakeKeyHash]})
-}
+export const getRewardAccountSummary = async (stakeKeyHash: string) =>
+	queryClient((q) => q.rewardAccountSummaries({keys: [stakeKeyHash]}))
 
 let cachedProtocolParams: {epoch: number; protocolParams: ProtocolParameters} | undefined
 export const protocolParameters = async () => {
@@ -39,12 +36,6 @@ export const protocolParameters = async () => {
 	return cachedProtocolParams.protocolParams
 }
 
-export const getNetworkTip = async () => {
-	const client = await getLedgerStateQueryClient()
-	return client.networkTip()
-}
+export const getNetworkTip = () => queryClient((q) => q.networkTip())
 
-export const getLedgerTip = async () => {
-	const client = await getLedgerStateQueryClient()
-	return client.networkTip()
-}
+export const getLedgerTip = () => queryClient((q) => q.ledgerTip())

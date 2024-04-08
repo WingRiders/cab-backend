@@ -1,13 +1,14 @@
 import {Elysia, mapResponse, t} from 'elysia'
 import JSONbig from 'json-bigint'
-import {
-	getUTxOs,
-	getLedgerTip,
-	protocolParameters,
-	getRewardAccountSummary,
-	getNetworkTip,
-} from './ogmios/ledgerStateQuery'
 import {addressesByStakeKeyHash, getLastBlock, transactionByTxHash} from './db/db'
+import {
+	getLedgerTip,
+	getNetworkTip,
+	getRewardAccountSummary,
+	getUTxOs,
+	protocolParameters,
+} from './ogmios/ledgerStateQuery'
+import {submitTx} from './ogmios/submit'
 
 const {stringify} = JSONbig({useNativeBigInt: true})
 
@@ -59,7 +60,9 @@ export const app = new Elysia()
 	})
 
 	// Submit a TX - non-blocking - don't wait for TX delivery
-	.post('/submitTx', () => 'TODO')
+	.post('/submitTx', ({body: {transactionCbor}}) => submitTx(transactionCbor), {
+		body: t.Object({transactionCbor: t.String()}),
+	})
 
 	// Get health of the service
 	.get('/healthcheck', async () => {
