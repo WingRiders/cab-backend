@@ -226,6 +226,65 @@ DB_SCHEMA=cab_backend
 ```
 
 
+## DB Schema
+```mermaid
+classDiagram
+direction BT
+class address {
+   integer first_slot
+   bytea address
+}
+class block {
+   bytea hash
+   integer slot
+}
+class transaction {
+   integer slot
+   bytea tx_hash
+}
+
+address  -->  block : first_slot - slot
+transaction  -->  block : slot
+```
+<details>
+<summary>See complete definition</summary>
+
+```sql
+create table if not exists block (
+    slot integer not null primary key,
+    hash bytea   not null
+);
+
+create table if not exists transaction
+(
+    tx_hash bytea   not null primary key,
+    slot    integer not null
+        constraint transaction_slot_block_slot_fk
+            references block 
+            on delete cascade
+);
+
+create index if not exists slot_idx on transaction (slot);
+
+create table if not exists address
+(
+    address    bytea   not null primary key,
+    first_slot integer not null
+        constraint address_first_slot_block_slot_fk
+            references block
+            on delete cascade
+);
+
+create index if not exists payment_credential_idx on address (substr(address, 2, 28));
+
+create index if not exists staking_credential_idx on address (substr(address, 30, 28));
+
+create index if not exists first_slot_idx on .address (first_slot);
+
+```
+</details>
+
+
 ## Development
 The project was created with [bun](https://github.com/CardanoSolutions/kupo). To install dependencies:
 
