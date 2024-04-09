@@ -23,12 +23,13 @@ COPY . .
 RUN bun test
 
 # copy production dependencies and source code into final image
-FROM oven/bun:distroless as release
-# COPY --from=install /temp/prod/node_modules node_modules
+FROM base as release
+COPY --from=install /temp/prod/node_modules node_modules
+COPY --from=prerelease /usr/src/app/drizzle drizzle
 COPY --from=prerelease /usr/src/app/src src
 COPY --from=prerelease /usr/src/app/package.json .
 
-# # run the app
+# run the app
 USER bun
 ENV NODE_ENV=production
 EXPOSE 3000/tcp

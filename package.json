@@ -1,6 +1,6 @@
 {
   "name": "cab-backend",
-  "description": "Open-source light-weight backend to CAB",
+  "description": "Open-source light-weight backend for CAB, written in TypeScript using PostgreSQL for data storage",
   "repository": "git@github.com:WingRiders/cab-backend.git",
   "version": "0.1.0",
   "type": "module",
@@ -8,12 +8,11 @@
   "author": "TechRiderWR <techrider@wingriders.com>",
   "license": "MIT",
   "scripts": {
-    "db:migrate": "bun run src/db/migrate.ts",
     "dev": "bun --watch src/index.ts",
-    "lint": "bun biome check src && tsc --noEmit",
     "fix": "bun biome check --apply src",
-    "start": "NODE_ENV=production bun src/index.ts",
-    "test": "bun test"
+    "lint": "bun biome check src && tsc --noEmit",
+    "migrate": "bun run src/db/migrate.ts",
+    "start": "NODE_ENV=production bun src/index.ts"
   },
   "dependencies": {
     "@cardano-ogmios/client": "^6.1.0",
