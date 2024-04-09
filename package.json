@@ -21,6 +21,7 @@
     "bech32": "^2.0.0",
     "drizzle-orm": "^0.30.6",
     "elysia": "^1.0.7",
+    "env-schema": "^5.2.1",
     "json-bigint": "^1.0.0",
     "pino": "^8.19.0",
     "postgres": "^3.4.4"

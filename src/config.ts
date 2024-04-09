@@ -1,9 +1,22 @@
-import {Type} from '@sinclair/typebox'
-import {Value} from '@sinclair/typebox/value'
+import {type Static, Type, type UnsafeOptions} from '@sinclair/typebox'
+import envSchema from 'env-schema'
+
+const StringEnum = <T extends string[]>(
+	values: [...T],
+	options?: Exclude<UnsafeOptions, 'type' | 'enum'>,
+) =>
+	Type.Unsafe<T[number]>({
+		...options,
+		type: 'string',
+		enum: values,
+	})
 
 const Env = Type.Object({
+	MODE: StringEnum(['aggregation', 'server', 'both'], {default: 'both'}),
 	PORT: Type.Number({default: 3000}),
-	LOG_LEVEL: Type.String({default: 'info'}),
+	LOG_LEVEL: StringEnum(['silent', 'trace', 'debug', 'info', 'warn', 'error', 'fatal'], {
+		default: 'info',
+	}),
 	OGMIOS_HOST: Type.String({default: 'localhost'}),
 	OGMIOS_PORT: Type.Number({default: 1337}),
 	DB_HOST: Type.String({default: 'localhost'}),
@@ -14,11 +27,4 @@ const Env = Type.Object({
 	DB_SCHEMA: Type.String({default: 'cab_backend'}),
 })
 
-const defaultedEnv = Value.Cast(Env, Value.Convert(Env, process.env))
-
-if (!Value.Check(Env, defaultedEnv)) {
-	console.error([...Value.Errors(Env, defaultedEnv)])
-	throw new Error('Invalid env variables')
-}
-
-export const config = defaultedEnv
+export const config = envSchema<Static<typeof Env>>({schema: Env})
