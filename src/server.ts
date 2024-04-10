@@ -33,6 +33,9 @@ export const app = new Elysia()
   // Get protocol params - cached for whole epoch
   .get('/protocolParameters', () => protocolParameters())
 
+  // Get ledger tip
+  .get('/ledgerTip', () => getLedgerTip())
+
   // Get UTxOs for given addresses, optionally tied to a specific slot
   .get('/utxos', ({query: {addresses}}) => getUTxOs({addresses}), {
     query: t.Object({addresses: t.Array(t.String())}),

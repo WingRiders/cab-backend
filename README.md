@@ -91,6 +91,21 @@ Return protocol parameters obtained from Ogmios, the returned type corresponds t
 ```
 Array of UTxOs as defined in [`@cardano-ogmios/schema`](https://github.com/CardanoSolutions/ogmios/tree/master/clients/TypeScript/packages/schema).
 
+### Get ledger tip
+#### Request
+`GET /ledgerTip`
+
+### Response
+**Code:** 200
+
+**Content Example**
+```json
+{
+    "slot": 57091262,
+    "id": "896db99c3843a1d8f55adcdb9818cecfe6d19d13cd724b5ebd1c5765b2521388"
+}
+```
+
 ### Get reward account summary for stake key hash
 #### Request
 `GET /rewardAccountSummary/{stakeKeyHash}`
