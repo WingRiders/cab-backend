@@ -12,7 +12,9 @@ import {submitTx} from './ogmios/submit'
 
 const {stringify} = JSONbig({useNativeBigInt: true})
 
-export const app = new Elysia()
+export const baseApp = new Elysia().get('/healthstatus', () => ({healthy: true}))
+
+export const app = baseApp
 	// Handle encoding of bigints returned by Ogmios and encode Buffers as hex strings
 	.mapResponse(({response, set}) => {
 		if (typeof response === 'object') {
@@ -82,6 +84,7 @@ export const app = new Elysia()
 			networkSlot,
 			ledgerSlot,
 			lastBlockSlot,
+			version: process.env.npm_package_version,
 			uptime: process.uptime(),
 		}
 	})
