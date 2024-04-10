@@ -51,20 +51,20 @@ const writeBuffersIfNecessary = async (threshold = bufferSize) => {
     // Do the inserts in one transaction to ensure data doesn't get corrupted if the
     // execution fails somewhere
     await sql.begin(async (sql) => {
-      const counts = {blocks: 0, transactions: 0, addresses: 0}
+      const counts = {blocks: '0/0', transactions: '0/0', addresses: '0/0'}
       // Inserting data with unnest ensures that the query is stable and reduces the
       // amount of time it takes to parse the query.
       const blocks = await sql`INSERT INTO block (slot, hash) SELECT * FROM unnest(${sql.array(
         blockBuffer.map(({slot}) => slot),
       )}::integer[], ${sql.array(blockBuffer.map(({hash}) => hash))}::bytea[])`
-      counts.blocks = blocks.count
+      counts.blocks = `${blocks.count}/${blockBuffer.length}`
 
       if (txBuffer.length > 0) {
         const txs =
           await sql`INSERT INTO transaction (tx_hash, slot) SELECT * FROM unnest(${sql.array(
             txBuffer.map(({txHash}) => txHash),
           )}::bytea[], ${sql.array(txBuffer.map(({slot}) => slot))}::integer[])`
-        counts.transactions = txs.count
+        counts.transactions = `${txs.count}/${txBuffer.length}`
 
         // Addresses might repeat, so `ON CONFLICT DO NOTHING` skips any duplicates and keeps
         // the first address only in the DB
@@ -73,10 +73,10 @@ const writeBuffersIfNecessary = async (threshold = bufferSize) => {
             addressBuffer.map(({address}) => address),
           )}::bytea[], ${sql.array(addressBuffer.map(({firstSlot}) => firstSlot))}::integer[])
 					ON CONFLICT DO NOTHING`
-        counts.addresses = addresses.count
+        counts.addresses = `${addresses.count}/${addressBuffer.length}`
       }
 
-      logger.debug(counts, 'Wrote buffers to DB')
+      logger.info(counts, 'Wrote buffers to DB')
     })
 
     blockBuffer = []
