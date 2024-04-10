@@ -75,7 +75,7 @@ export const app = new Elysia()
   })
 
   // Get health of the service
-  .get('/healthcheck', async () => {
+  .get('/healthcheck', async ({set}) => {
     // Check sync status
     const [networkSlot, ledgerSlot, lastBlockSlot] = await Promise.all([
       getNetworkTip().then((tip) => (tip === 'origin' ? 0 : tip.slot)),
@@ -83,12 +83,16 @@ export const app = new Elysia()
       getLastBlock().then((block) => (block ? block.slot : 0)),
     ])
     const healthyThresholdSlot = 10
+    const healthy =
+      networkSlot - ledgerSlot < healthyThresholdSlot &&
+      ledgerSlot - lastBlockSlot < healthyThresholdSlot
+
+    if (!healthy) {
+      set.status = 503
+    }
 
     return {
-      healthy:
-        networkSlot - ledgerSlot < healthyThresholdSlot &&
-        ledgerSlot - lastBlockSlot < healthyThresholdSlot,
-      healthyThresholdSlot,
+      healthy,
       networkSlot,
       ledgerSlot,
       lastBlockSlot,
