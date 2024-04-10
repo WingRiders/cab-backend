@@ -11,7 +11,6 @@
     "dev": "bun --watch src/index.ts",
     "fix": "bun biome check --apply src",
     "lint": "bun biome check src && tsc --noEmit",
-    "migrate": "bun run src/db/migrate.ts",
     "start": "NODE_ENV=production bun src/index.ts"
   },
   "dependencies": {

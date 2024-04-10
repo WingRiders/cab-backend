@@ -230,6 +230,8 @@ DB_SCHEMA=cab_backend
 
 
 ## DB Schema
+Migrations are autorun on start of the aggregator mode. The current schema is shown here:
+
 ```mermaid
 classDiagram
 direction BT

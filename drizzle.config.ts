@@ -6,10 +6,6 @@ export default {
 	out: './drizzle',
 	driver: 'pg',
 	dbCredentials: {
-		host: config.DB_HOST,
-		port: config.DB_PORT,
-		user: config.DB_USER,
-		password: config.DB_PASSWORD,
-		database: config.DB_NAME,
+		connectionString: `postgres://${config.DB_USER}:${config.DB_PASSWORD}@${config.DB_HOST}:${config.DB_PORT}/${config.DB_NAME}?schema=${config.DB_SCHEMA}`,
 	},
 } satisfies Config

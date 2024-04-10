@@ -14,7 +14,10 @@ const {stringify} = JSONbig({useNativeBigInt: true})
 
 export const baseApp = new Elysia().get('/healthstatus', () => ({healthy: true}))
 
-export const app = baseApp
+export const app = new Elysia()
+	// Reuse baseApp for /healthstatus
+	.use(baseApp)
+
 	// Handle encoding of bigints returned by Ogmios and encode Buffers as hex strings
 	.mapResponse(({response, set}) => {
 		if (typeof response === 'object') {
