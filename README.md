@@ -206,6 +206,9 @@ List of addresses in hexadecimal form
 ## Configuring
 Configuring is done with env vars.
 ```
+# Mode of operation - aggregator | server | both, default is both
+MODE=both
+
 # Port of the API server
 PORT=3000
 

@@ -12,7 +12,7 @@ const StringEnum = <T extends string[]>(
 	})
 
 const Env = Type.Object({
-	MODE: StringEnum(['aggregation', 'server', 'both'], {default: 'both'}),
+	MODE: StringEnum(['aggregator', 'server', 'both'], {default: 'both'}),
 	PORT: Type.Number({default: 3000}),
 	LOG_LEVEL: StringEnum(['silent', 'trace', 'debug', 'info', 'warn', 'error', 'fatal'], {
 		default: 'info',

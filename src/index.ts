@@ -8,7 +8,7 @@ import {app, baseApp} from './server'
 // It's needed for both the chain synchronization client and the HTTP server
 await getContext()
 
-if (config.MODE === 'aggregation' || config.MODE === 'both') {
+if (config.MODE === 'aggregator' || config.MODE === 'both') {
 	// Start the Ogmios chain synchornization client and the base HTTP server
 	// with /healthstatus endpoint
 	baseApp.listen(config.PORT)
