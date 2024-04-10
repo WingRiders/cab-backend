@@ -34,9 +34,11 @@ export const app = new Elysia()
 	.get('/protocolParameters', () => protocolParameters())
 
 	// Get UTxOs for given addresses, optionally tied to a specific slot
-	// POST is not correct in terms of REST, but easier to handle array params
-	.post('/utxos', ({body: {addresses}}) => getUTxOs({addresses}), {
-		body: t.Object({addresses: t.Array(t.String())}),
+	.get('/utxos', ({query: {addresses}}) => getUTxOs({addresses}), {
+		query: t.Object({addresses: t.Array(t.String())}),
+		transform: ({query}) => {
+			query.addresses = (query.addresses as unknown as string).split(',')
+		},
 	})
 
 	// Get stake key info - rewards, delegated, stake pool id

@@ -52,17 +52,10 @@ Return protocol parameters obtained from Ogmios, the returned type corresponds t
 
 ### Get UTxOs for addresses
 #### Request
-`POST /utxos`
+`GET /utxos?addresses=addr...,addr...`
 
-**Body:** Array of addresses in BECH32 form or in hexadecimal format
-```json
-{
-    "addresses": [
-        "addr_test1wz6zjuut6mx93dw8jvksqx4zh5zul6j8qg992myvw575gdsgwxjuc",
-        "004a6518c2871c9c05a06bd6995d6e03ebd973a03d9509324abc9138347a507e54fcae6f3b497ddf679e29d170dad54905e19bbcfb7d398756"
-    ]
-}
-```
+**Query:**
+- `addresses` - Array of addresses in BECH32 form or in hexadecimal format, separated by commas `,`
 
 #### Response
 **Code:** 200
