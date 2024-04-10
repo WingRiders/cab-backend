@@ -2,7 +2,7 @@
   "name": "cab-backend",
   "description": "Open-source light-weight backend for CAB, written in TypeScript using PostgreSQL for data storage",
   "repository": "git@github.com:WingRiders/cab-backend.git",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "module": "src/index.ts",
   "author": "TechRiderWR <techrider@wingriders.com>",

@@ -1,6 +1,8 @@
 <p align="center"><img src="https://assets.wingriders.com/wingriders_logo.png" /></p>
 
 # CAB Backend
+[![Docker Pulls](https://img.shields.io/docker/pulls/wingriders/cab-backend?style=for-the-badge&logo=docker&logoColor=ffffff&color=05bf75)](https://hub.docker.com/r/wingriders/cab-backend)
+
 Custom backend for CAB, written in TypeScript using PostgreSQL for data storage. Core highlights
 
 - ⚖️ Light-weight, syncs the bare minimum - block slots and hashes, tx hashes of submitted transactions, and used addresses
