@@ -2,7 +2,7 @@
   "name": "cab-backend",
   "description": "Open-source light-weight backend for CAB, written in TypeScript using PostgreSQL for data storage",
   "repository": "git@github.com:WingRiders/cab-backend.git",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "module": "src/index.ts",
   "author": "TechRiderWR <techrider@wingriders.com>",
@@ -22,7 +22,8 @@
     "env-schema": "^5.2.1",
     "json-bigint": "^1.0.0",
     "pino": "^8.19.0",
-    "postgres": "^3.4.4"
+    "postgres": "^3.4.4",
+    "prexit": "^2.2.0"
   },
   "devDependencies": {
     "@biomejs/biome": "1.6.2",

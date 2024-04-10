@@ -1,4 +1,6 @@
+import prexit from 'prexit'
 import {config} from './config'
+import {sql} from './db/db'
 import {migrateDb} from './db/migrate'
 import {logger} from './logger'
 import {startChainSyncClient} from './ogmios/chainSync'
@@ -17,8 +19,11 @@ if (config.MODE === 'aggregator' || config.MODE === 'both') {
   startChainSyncClient()
 
   // Start the base HTTP server with /healthstatus endpoint
-  baseApp.listen(config.PORT)
-  logger.info(`Server listening on http://localhost:${config.PORT}`)
+  // if the mode is 'both' the server will be started later
+  if (config.MODE !== 'both') {
+    baseApp.listen(config.PORT)
+    logger.info(`Server listening on http://localhost:${config.PORT}`)
+  }
 }
 
 if (config.MODE === 'server' || config.MODE === 'both') {
@@ -26,3 +31,8 @@ if (config.MODE === 'server' || config.MODE === 'both') {
   app.listen(config.PORT)
   logger.info(`Server listening on http://localhost:${config.PORT}`)
 }
+
+prexit(async () => {
+  logger.info('Shutting down')
+  await sql.end({timeout: 5})
+})
