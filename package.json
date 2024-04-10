@@ -9,8 +9,8 @@
   "license": "MIT",
   "scripts": {
     "dev": "bun --watch src/index.ts",
-    "fix": "bun biome check --apply src",
-    "lint": "bun biome check src && tsc --noEmit",
+    "fix": "bun biome check --apply src test",
+    "lint": "bun biome check src test && tsc --noEmit",
     "start": "NODE_ENV=production bun src/index.ts"
   },
   "dependencies": {

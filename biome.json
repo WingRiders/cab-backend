@@ -3,6 +3,9 @@
   "organizeImports": {
     "enabled": true
   },
+  "formatter": {
+    "indentStyle": "space"
+  },
   "javascript": {
     "formatter": {
       "bracketSpacing": false,

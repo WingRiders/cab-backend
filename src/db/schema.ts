@@ -1,27 +1,27 @@
 import {customType, index, integer, pgTable} from 'drizzle-orm/pg-core'
 
 const bytea = customType<{data: Buffer}>({
-	dataType: () => 'bytea',
+  dataType: () => 'bytea',
 })
 
 export const blocks = pgTable('block', {
-	slot: integer('slot').primaryKey(),
-	hash: bytea('hash').notNull(),
+  slot: integer('slot').primaryKey(),
+  hash: bytea('hash').notNull(),
 })
 
 export type NewBlock = typeof blocks.$inferInsert
 
 export const transactions = pgTable(
-	'transaction',
-	{
-		txHash: bytea('tx_hash').primaryKey(),
-		slot: integer('slot')
-			.notNull()
-			.references(() => blocks.slot, {onDelete: 'cascade'}),
-	},
-	(table) => ({
-		slotIdx: index('slot_idx').on(table.slot),
-	}),
+  'transaction',
+  {
+    txHash: bytea('tx_hash').primaryKey(),
+    slot: integer('slot')
+      .notNull()
+      .references(() => blocks.slot, {onDelete: 'cascade'}),
+  },
+  (table) => ({
+    slotIdx: index('slot_idx').on(table.slot),
+  }),
 )
 
 export type NewTx = typeof transactions.$inferInsert
@@ -34,16 +34,16 @@ export type NewTx = typeof transactions.$inferInsert
 //
 // note: substr indexes from 1, 1st byte - address type, 2-29 - payment cred, 30-58 - staking cred
 export const addresses = pgTable(
-	'address',
-	{
-		address: bytea('address').primaryKey(),
-		firstSlot: integer('first_slot')
-			.notNull()
-			.references(() => blocks.slot, {onDelete: 'cascade'}),
-	},
-	(table) => ({
-		firstSlotIdx: index('first_slot_idx').on(table.firstSlot),
-	}),
+  'address',
+  {
+    address: bytea('address').primaryKey(),
+    firstSlot: integer('first_slot')
+      .notNull()
+      .references(() => blocks.slot, {onDelete: 'cascade'}),
+  },
+  (table) => ({
+    firstSlotIdx: index('first_slot_idx').on(table.firstSlot),
+  }),
 )
 
 export type NewAddress = typeof addresses.$inferInsert

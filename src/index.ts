@@ -10,19 +10,19 @@ import {app, baseApp} from './server'
 await getContext()
 
 if (config.MODE === 'aggregator' || config.MODE === 'both') {
-	// Before starting the aggregator run the database migrations
-	await migrateDb()
+  // Before starting the aggregator run the database migrations
+  await migrateDb()
 
-	// Start the Ogmios chain synchornization client
-	startChainSyncClient()
+  // Start the Ogmios chain synchornization client
+  startChainSyncClient()
 
-	// Start the base HTTP server with /healthstatus endpoint
-	baseApp.listen(config.PORT)
-	logger.info(`Server listening on http://localhost:${config.PORT}`)
+  // Start the base HTTP server with /healthstatus endpoint
+  baseApp.listen(config.PORT)
+  logger.info(`Server listening on http://localhost:${config.PORT}`)
 }
 
 if (config.MODE === 'server' || config.MODE === 'both') {
-	// Start the HTTP server, by default on port 3000
-	app.listen(config.PORT)
-	logger.info(`Server listening on http://localhost:${config.PORT}`)
+  // Start the HTTP server, by default on port 3000
+  app.listen(config.PORT)
+  logger.info(`Server listening on http://localhost:${config.PORT}`)
 }
