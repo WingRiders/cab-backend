@@ -176,7 +176,10 @@ List of addresses in hexadecimal form
 ```json
 {
     "txHash": "0eaf8ec56a53b49579549833c6c761945ad5af8f3597a45a46b967c3074f930a",
-    "slot": 56630505
+    "slot": 56630505,
+    "block": {
+        "height": 2114733
+    }
 }
 ```
 

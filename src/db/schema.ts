@@ -1,3 +1,4 @@
+import {relations} from 'drizzle-orm'
 import {customType, index, integer, pgTable} from 'drizzle-orm/pg-core'
 
 const bytea = customType<{data: Buffer}>({
@@ -22,6 +23,10 @@ export const transactions = pgTable(
     slotIdx: index('slot_idx').on(table.slot),
   }),
 )
+
+export const transactionsRelations = relations(transactions, ({one}) => ({
+  block: one(blocks, {fields: [transactions.slot], references: [blocks.slot]}),
+}))
 
 export type NewTx = typeof transactions.$inferInsert
 

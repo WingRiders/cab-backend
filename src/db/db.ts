@@ -14,6 +14,7 @@ export const getLastBlock = () => db.query.blocks.findFirst({orderBy: [desc(sche
 export const transactionByTxHash = (txHash: string) =>
   db.query.transactions.findFirst({
     where: eq(schema.transactions.txHash, Buffer.from(txHash, 'hex')),
+    with: {block: {columns: {height: true}}},
   })
 
 export const addressesByStakeKeyHash = (stakeKeyHash: string) =>
