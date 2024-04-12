@@ -7,6 +7,7 @@ const bytea = customType<{data: Buffer}>({
 export const blocks = pgTable('block', {
   slot: integer('slot').primaryKey(),
   hash: bytea('hash').notNull(),
+  height: integer('height').notNull(),
 })
 
 export type NewBlock = typeof blocks.$inferInsert
@@ -15,9 +16,7 @@ export const transactions = pgTable(
   'transaction',
   {
     txHash: bytea('tx_hash').primaryKey(),
-    slot: integer('slot')
-      .notNull()
-      .references(() => blocks.slot, {onDelete: 'cascade'}),
+    slot: integer('slot').notNull(),
   },
   (table) => ({
     slotIdx: index('slot_idx').on(table.slot),
@@ -37,9 +36,7 @@ export const addresses = pgTable(
   'address',
   {
     address: bytea('address').primaryKey(),
-    firstSlot: integer('first_slot')
-      .notNull()
-      .references(() => blocks.slot, {onDelete: 'cascade'}),
+    firstSlot: integer('first_slot').notNull(),
   },
   (table) => ({
     firstSlotIdx: index('first_slot_idx').on(table.firstSlot),

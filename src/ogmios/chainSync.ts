@@ -3,13 +3,20 @@ import type {BlockPraos, Point} from '@cardano-ogmios/schema'
 import {bech32} from 'bech32'
 import {desc, gte} from 'drizzle-orm'
 import {db, sql} from '../db/db'
-import {type NewAddress, type NewBlock, type NewTx, blocks} from '../db/schema'
+import {
+  type NewAddress,
+  type NewBlock,
+  type NewTx,
+  blocks,
+  transactions,
+  addresses,
+} from '../db/schema'
 import {logger} from '../logger'
 import {getContext} from './ogmios'
 
 // Aggregation logic is here
 const processBlock = async (block: BlockPraos) => {
-  blockBuffer.push({slot: block.slot, hash: Buffer.from(block.id, 'hex')})
+  blockBuffer.push({slot: block.slot, hash: Buffer.from(block.id, 'hex'), height: block.height})
 
   const txHashes = block.transactions?.map((tx) => tx.id) || []
   txBuffer.push(
@@ -28,8 +35,16 @@ const processBlock = async (block: BlockPraos) => {
   )
 }
 
-const processRollback = (point: 'origin' | Point) =>
-  point === 'origin' ? db.delete(blocks) : db.delete(blocks).where(gte(blocks.slot, point.slot))
+const processRollback = async (point: 'origin' | Point) => {
+  const rollbackSlot = point === 'origin' ? 0 : point.slot
+  await db.transaction((tx) =>
+    Promise.all([
+      tx.delete(blocks).where(gte(blocks.slot, rollbackSlot)),
+      tx.delete(transactions).where(gte(transactions.slot, rollbackSlot)),
+      tx.delete(addresses).where(gte(addresses.firstSlot, rollbackSlot)),
+    ]),
+  )
+}
 
 // Aggregation framework below
 // Buffering is suitable when doing the initial sync
@@ -39,7 +54,7 @@ let txBuffer: NewTx[] = []
 let addressBuffer: NewAddress[] = []
 
 // Write buffers into DB
-const writeBuffersIfNecessary = async (threshold = bufferSize) => {
+const writeBuffersIfNecessary = async (latestHeight: number, threshold = bufferSize) => {
   // If one buffer is being written others must as well as they might depend on each other
   // For example block determines in case of restarts the intersect for resuming
   // chain sync. If block buffer was written but other data not, it could get lost forever.
@@ -48,36 +63,41 @@ const writeBuffersIfNecessary = async (threshold = bufferSize) => {
     txBuffer.length >= threshold ||
     addressBuffer.length >= threshold
   ) {
+    const stats = {
+      blocks: '0/0',
+      transactions: '0/0',
+      addresses: '0/0',
+      progress: (blockBuffer[blockBuffer.length - 1]?.height || 1) / (latestHeight || 1),
+    }
+
     // Do the inserts in one transaction to ensure data doesn't get corrupted if the
     // execution fails somewhere
     await sql.begin(async (sql) => {
-      const counts = {blocks: '0/0', transactions: '0/0', addresses: '0/0'}
       // Inserting data with unnest ensures that the query is stable and reduces the
       // amount of time it takes to parse the query.
-      const blocks = await sql`INSERT INTO block (slot, hash) SELECT * FROM unnest(${sql.array(
-        blockBuffer.map(({slot}) => slot),
-      )}::integer[], ${sql.array(blockBuffer.map(({hash}) => hash))}::bytea[])`
-      counts.blocks = `${blocks.count}/${blockBuffer.length}`
+      const blocks = await sql`INSERT INTO block (slot, hash, height) SELECT * FROM unnest(
+          ${sql.array(blockBuffer.map(({slot}) => slot))}::integer[],
+          ${sql.array(blockBuffer.map(({hash}) => hash))}::bytea[],
+          ${sql.array(blockBuffer.map(({height}) => height))}::integer[])`
+      stats.blocks = `${blocks.count}/${blockBuffer.length}`
 
       if (txBuffer.length > 0) {
-        const txs =
-          await sql`INSERT INTO transaction (tx_hash, slot) SELECT * FROM unnest(${sql.array(
-            txBuffer.map(({txHash}) => txHash),
-          )}::bytea[], ${sql.array(txBuffer.map(({slot}) => slot))}::integer[])`
-        counts.transactions = `${txs.count}/${txBuffer.length}`
+        const txs = await sql`INSERT INTO transaction (tx_hash, slot) SELECT * FROM unnest(
+            ${sql.array(txBuffer.map(({txHash}) => txHash))}::bytea[],
+            ${sql.array(txBuffer.map(({slot}) => slot))}::integer[])`
+        stats.transactions = `${txs.count}/${txBuffer.length}`
 
         // Addresses might repeat, so `ON CONFLICT DO NOTHING` skips any duplicates and keeps
         // the first address only in the DB
-        const addresses =
-          await sql`INSERT INTO address (address, first_slot) SELECT * FROM unnest(${sql.array(
-            addressBuffer.map(({address}) => address),
-          )}::bytea[], ${sql.array(addressBuffer.map(({firstSlot}) => firstSlot))}::integer[])
+        const addresses = await sql`INSERT INTO address (address, first_slot) SELECT * FROM unnest(
+            ${sql.array(addressBuffer.map(({address}) => address))}::bytea[],
+            ${sql.array(addressBuffer.map(({firstSlot}) => firstSlot))}::integer[])
 					ON CONFLICT DO NOTHING`
-        counts.addresses = `${addresses.count}/${addressBuffer.length}`
+        stats.addresses = `${addresses.count}/${addressBuffer.length}`
       }
-
-      logger.info(counts, 'Wrote buffers to DB')
     })
+
+    logger.info(stats, 'Wrote buffers to DB')
 
     blockBuffer = []
     txBuffer = []
@@ -113,9 +133,9 @@ export const startChainSyncClient = async () => {
 
         // Decide if to use buferring based on proximity to ledger tip
         if (response.tip !== 'origin' && response.tip.height - 10 < response.block.height) {
-          await writeBuffersIfNecessary(1)
+          await writeBuffersIfNecessary(response.tip.height, 1)
         } else {
-          await writeBuffersIfNecessary()
+          await writeBuffersIfNecessary(response.tip === 'origin' ? 0 : response.tip.height)
         }
       }
       nextBlock()
