@@ -12,7 +12,36 @@ import {submitTx} from './ogmios/submit'
 
 const {stringify} = JSONbig({useNativeBigInt: true})
 
-export const baseApp = new Elysia().get('/healthstatus', () => ({status: 'ok'}))
+export const baseApp = new Elysia()
+  // Get healthstatus, just reports if the service is up
+  .get('/healthstatus', () => ({status: 'ok'}))
+
+  // Get health of the service
+  .get('/healthcheck', async ({set}) => {
+    // Check sync status
+    const [networkSlot, ledgerSlot, lastBlockSlot] = await Promise.all([
+      getNetworkTip().then((tip) => (tip === 'origin' ? 0 : tip.slot)),
+      getLedgerTip().then((tip) => (tip === 'origin' ? 0 : tip.slot)),
+      getLastBlock().then((block) => (block ? block.slot : 0)),
+    ])
+    const healthyThresholdSlot = 10
+    const healthy =
+      networkSlot - ledgerSlot < healthyThresholdSlot &&
+      ledgerSlot - lastBlockSlot < healthyThresholdSlot
+
+    if (!healthy) {
+      set.status = 503
+    }
+
+    return {
+      healthy,
+      networkSlot,
+      ledgerSlot,
+      lastBlockSlot,
+      version: process.env.npm_package_version,
+      uptime: process.uptime(),
+    }
+  })
 
 export const app = new Elysia()
   // Reuse baseApp for /healthstatus
@@ -72,31 +101,4 @@ export const app = new Elysia()
   // Submit a TX - non-blocking - don't wait for TX delivery
   .post('/submitTx', ({body: {transactionCbor}}) => submitTx(transactionCbor), {
     body: t.Object({transactionCbor: t.String()}),
-  })
-
-  // Get health of the service
-  .get('/healthcheck', async ({set}) => {
-    // Check sync status
-    const [networkSlot, ledgerSlot, lastBlockSlot] = await Promise.all([
-      getNetworkTip().then((tip) => (tip === 'origin' ? 0 : tip.slot)),
-      getLedgerTip().then((tip) => (tip === 'origin' ? 0 : tip.slot)),
-      getLastBlock().then((block) => (block ? block.slot : 0)),
-    ])
-    const healthyThresholdSlot = 10
-    const healthy =
-      networkSlot - ledgerSlot < healthyThresholdSlot &&
-      ledgerSlot - lastBlockSlot < healthyThresholdSlot
-
-    if (!healthy) {
-      set.status = 503
-    }
-
-    return {
-      healthy,
-      networkSlot,
-      ledgerSlot,
-      lastBlockSlot,
-      version: process.env.npm_package_version,
-      uptime: process.uptime(),
-    }
   })
