@@ -1,4 +1,4 @@
-name: Publish Docker Image
+name: Lint, Test, and Publish Docker Image
 
 on:
   push:
@@ -7,7 +7,27 @@ on:
     tags: ["v*.*.*"]
 
 jobs:
+  lint:
+    runs-on: oven/bun
+    steps:
+      - name: Lint code
+        run: |
+          bun lint
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint@v2
+        with:
+          files: Dockerfile
+
+  test:
+    needs: lint
+    runs-on: oven/bun
+    steps:
+      - name: Test code
+        run: |
+          bun test
+
   build:
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
