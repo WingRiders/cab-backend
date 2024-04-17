@@ -1,0 +1,76 @@
+version: "3.5"
+
+services:
+  cardano-node:
+    image: ghcr.io/intersectmbo/cardano-node:8.9.2
+    restart: unless-stopped
+    command: [
+      "run",
+      "--config", "/config/config.json",
+      "--database-path", "/data/db",
+      "--socket-path", "/ipc/node.socket",
+      "--topology", "/config/topology.json"
+    ]
+    volumes:
+      - ./server/config/network/${NETWORK:-mainnet}/cardano-node:/config
+      - ./server/config/network/${NETWORK:-mainnet}/genesis:/genesis
+      - node-db:/data
+      - node-ipc:/ipc
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "400k"
+        max-file: "20"
+
+  ogmios:
+    image: cardanosolutions/ogmios:6.2.0
+    restart: unless-stopped
+    command: [
+      "--host", "0.0.0.0",
+      "--node-socket", "/ipc/node.socket",
+      "--node-config", "/config/cardano-node/config.json"
+    ]
+    volumes:
+      - ./server/config/network/${NETWORK:-mainnet}:/config
+      - node-ipc:/ipc
+    ports:
+      - ${OGMIOS_PORT:-1337}:1337
+  
+  postgresql:
+    image: postgres:16.2-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cab_backend}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pass}
+      POSTGRES_DB: ${POSTGRES_DB:-cab_backend}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    ports:
+      - ${POSTGRES_PORT:-5432}:5432
+  
+  cab-backend:
+    image: wingriders/cab-backend:latest
+    restart: on-failure
+    build:
+      context: .
+      target: release
+      cache_from: [wingriders/cab-backend:latest]
+    environment:
+      MODE: ${CAB_BACKEND_MODE:-both}
+      PORT: ${CAB_BACKEND_PORT:-3000}
+      LOG_LEVEL: ${CAB_BACKEND_LOG_LEVEL:-info}
+      OGMIOS_HOST: ogmios
+      OGMIOS_PORT: 1337
+      DB_HOST: postgresql
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-cab_backend}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-pass}
+      DB_NAME: ${POSTGRES_DB:-cab_backend}
+      DB_SCHEMA: ${CAB_BACKEND_SCHEMA:-cab_backend}
+    ports:
+      - ${CAB_BACKEND_PORT:-3000}:3000
+
+volumes:
+  postgres:
+  node-db:
+  node-ipc:

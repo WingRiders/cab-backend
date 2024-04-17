@@ -21,6 +21,25 @@ We came to the conclusion that we actually don't need an indexer of all UTxOs as
 So the resulting backend is a bundle of a simple indexer, that aggregates used addresses, tx hashes of submitted transactions, and a wrapper around some required Ogmios queries. This results in a relatively low-profile, easy to maintain, and fast backend.
 
 
+## Deployment
+We provide Docker images for CAB Backend. There are individual tags for releases and the `latest` tag on Docker Hub mirrors the state of the `main` branch.
+
+To run CAB Backend requires:
+- cardano-node
+- ogmios
+- PostgreSQL
+
+Example deployment is described in [`docker-compose.yml`](./docker-compose.yml).
+
+### Modes
+The CAB Backend can be run in three modes:
+- `aggregator` - runs only the chain sync component of the backend, indexing/aggregating the relevant on-chain data to database, and minimal healthstatus API
+- `server` - runs the API server that runs queries against data in database
+- `both` - runs both modes simultaneously
+
+In our experience separating services these way proved useful, as it enables easier horizontal scaling of the server, which can be beneficial under higher loads. Bear in mind, that if the bottle-neck are the Ogmios queries, Ogmios and cardano-node might also need to be horizontally scaled.
+
+
 ## API
 ### Get protocol parameters
 #### Request
