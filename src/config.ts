@@ -1,5 +1,6 @@
 import {type Static, Type, type UnsafeOptions} from '@sinclair/typebox'
 import envSchema from 'env-schema'
+import pino from 'pino'
 
 const StringEnum = <T extends string[]>(
   values: [...T],
@@ -27,4 +28,14 @@ const Env = Type.Object({
   DB_SCHEMA: Type.String({default: 'cab_backend'}),
 })
 
-export const config = envSchema<Static<typeof Env>>({schema: Env})
+const unwrapEnv = () => {
+  try {
+    return envSchema<Static<typeof Env>>({schema: Env})
+  } catch (error) {
+    // cannot reuse logger here as it requires config to initialize
+    pino({name: 'cab-backend'}).error(error)
+    process.exit(1)
+  }
+}
+
+export const config = unwrapEnv()
