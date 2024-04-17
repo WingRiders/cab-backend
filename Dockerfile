@@ -28,9 +28,14 @@ COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=prerelease /usr/src/app/drizzle drizzle
 COPY --from=prerelease /usr/src/app/src src
 COPY --from=prerelease /usr/src/app/package.json .
+COPY healthcheck.sh /usr/src/app/healthcheck.sh
+
+# define healthcheck
+HEALTHCHECK --start-period=10s --interval=30s --retries=10 CMD /usr/src/app/healthcheck.sh
 
 # run the app
 USER bun
 ENV NODE_ENV=production
+ENV PORT=3000
 EXPOSE 3000/tcp
 CMD [ "./src/index.ts" ]
