@@ -7,9 +7,9 @@ import {
   type NewAddress,
   type NewBlock,
   type NewTx,
+  addresses,
   blocks,
   transactions,
-  addresses,
 } from '../db/schema'
 import {logger} from '../logger'
 import {getContext} from './ogmios'
