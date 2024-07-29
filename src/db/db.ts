@@ -1,4 +1,5 @@
-import {desc, sql as dsql, eq} from 'drizzle-orm'
+import {bech32} from 'bech32'
+import {desc, sql as dsql, eq, inArray} from 'drizzle-orm'
 import {drizzle} from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import {dbConnectionOptions} from './config'
@@ -20,4 +21,12 @@ export const transactionByTxHash = (txHash: string) =>
 export const addressesByStakeKeyHash = (stakeKeyHash: string) =>
   db.query.addresses.findMany({
     where: dsql`substr(${schema.addresses},30,28)=${Buffer.from(stakeKeyHash, 'hex')}`,
+  })
+
+export const filterUsedAddresses = (addresses: string[]) =>
+  db.query.addresses.findMany({
+    where: inArray(
+      schema.addresses.address,
+      addresses.map((address) => Buffer.from(bech32.fromWords(bech32.decode(address, 114).words))),
+    ),
   })

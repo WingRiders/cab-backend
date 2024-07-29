@@ -177,10 +177,33 @@ Array of UTxOs as defined in [`@cardano-ogmios/schema`](https://github.com/Carda
 **Content Example**
 ```json
 [
-    "004a6518c2871c9c05a06bd6995d6e03ebd973a03d9509324abc9138347a507e54fcae6f3b497ddf679e29d170dad54905e19bbcfb7d398756"
+  "004a6518c2871c9c05a06bd6995d6e03ebd973a03d9509324abc9138347a507e54fcae6f3b497ddf679e29d170dad54905e19bbcfb7d398756"
 ]
 ```
 List of addresses in hexadecimal form
+
+
+### Filter used addresses
+#### Request
+`POST /filterUsedAddresses`
+
+Body is JSON with fields:
+- `addresses` - list of strings; bech32 addresses
+
+#### Response
+**Code:** 200
+
+**Content Example**
+
+```json
+[
+  {
+    "address": "004a6518c2871c9c05a06bd6995d6e03ebd973a03d9509324abc9138347a507e54fcae6f3b497ddf679e29d170dad54905e19bbcfb7d398756",
+    "firstSlot": 66570472
+  }
+]
+```
+List of used addresses in hexadecimal form
 
 ### Get transaction by tx hash
 #### Request

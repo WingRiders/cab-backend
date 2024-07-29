@@ -1,6 +1,11 @@
 import {Elysia, mapResponse, t} from 'elysia'
 import JSONbig from 'json-bigint'
-import {addressesByStakeKeyHash, getLastBlock, transactionByTxHash} from './db/db'
+import {
+  addressesByStakeKeyHash,
+  filterUsedAddresses,
+  getLastBlock,
+  transactionByTxHash,
+} from './db/db'
 import {
   getLedgerTip,
   getNetworkTip,
@@ -101,4 +106,8 @@ export const app = new Elysia()
   // Submit a TX - non-blocking - don't wait for TX delivery
   .post('/submitTx', ({body: {transactionCbor}}) => submitTx(transactionCbor), {
     body: t.Object({transactionCbor: t.String()}),
+  })
+
+  .post('/filterUsedAddresses', ({body: {addresses}}) => filterUsedAddresses(addresses), {
+    body: t.Object({addresses: t.Array(t.String())}),
   })
