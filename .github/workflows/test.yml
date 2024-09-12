@@ -1,4 +1,4 @@
-name: Lint, Test, and Publish Docker Image
+name: Lint and Test
 
 on:
   pull_request:
