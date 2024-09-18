@@ -14,13 +14,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Import GPG key
-        shell: bash
-        env:
-          TECHRIDER_GPG_KEY: ${{ secrets.TECHRIDER_GPG_KEY }}
-        run: |
-          echo "$TECHRIDER_GPG_KEY" | gpg --import
-
       - name: Import SSH key
         shell: bash
         env:
@@ -41,12 +34,9 @@ jobs:
 
       - name: Rewrite commit history
         shell: bash
-        env:
-          TECHRIDER_GPG_KEY_ID: ${{ vars.TECHRIDER_GPG_KEY_ID }}
         run: |
           git config --local user.name "TechRiderWR"
           git config --local user.email "techrider@wingriders.com"
-          git config --local user.signingkey "$TECHRIDER_GPG_KEY_ID"
           git rebase public/main --exec "git commit --amend --no-edit --reset-author"
           firstDivergentCommit=$(git log --pretty="format:%h" | tail -n $(($(git rev-list --count public/main)+1)) | head -1)
           FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --msg-filter "sed -n '/Co-authored-by/Iq;p'" "$firstDivergentCommit~1..HEAD"
