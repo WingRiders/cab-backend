@@ -1,0 +1,58 @@
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  mirror:
+    name: Mirror commits to public repo
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Import GPG key
+        shell: bash
+        env:
+          TECHRIDER_GPG_KEY: ${{ secrets.TECHRIDER_GPG_KEY }}
+        run: |
+          echo "$TECHRIDER_GPG_KEY" | gpg --import
+
+      - name: Import SSH key
+        shell: bash
+        env:
+          TECHRIDER_SSH_PUBLIC_KEY: ${{ secrets.TECHRIDER_SSH_PUBLIC_KEY }}
+          TECHRIDER_SSH_PRIVATE_KEY: ${{ secrets.TECHRIDER_SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$TECHRIDER_SSH_PUBLIC_KEY" >~/.ssh/id_ed25519.pub
+          echo "$TECHRIDER_SSH_PRIVATE_KEY" >~/.ssh/id_ed25519
+          chmod 700 ~/.ssh
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/id_ed25519.pub
+
+      - name: Fetch public remote
+        shell: bash
+        run: |
+          git remote add public git@github.com:WingRiders/cab-backend.git
+          git fetch public main
+
+      - name: Rewrite commit history
+        shell: bash
+        env:
+          TECHRIDER_GPG_KEY_ID: ${{ vars.TECHRIDER_GPG_KEY_ID }}
+        run: |
+          git config --local user.name "TechRiderWR"
+          git config --local user.email "techrider@wingriders.com"
+          git config --local user.signingkey "$TECHRIDER_GPG_KEY_ID"
+          git rebase public/main --exec "git commit --amend --no-edit --reset-author"
+          firstDivergentCommit=$(git log --pretty="format:%h" | tail -n $(($(git rev-list --count public/main)+1)) | head -1)
+          FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --msg-filter "sed -n '/Co-authored-by/Iq;p'" "$firstDivergentCommit~1..HEAD"
+          git log --pretty="format:%an <%ae> (%h): %s"
+
+      - name: Push to public repo
+        shell: bash
+        run: |
+          git push public main
