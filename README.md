@@ -220,7 +220,8 @@ List of used addresses in hexadecimal form
     "txHash": "0eaf8ec56a53b49579549833c6c761945ad5af8f3597a45a46b967c3074f930a",
     "slot": 56630505,
     "block": {
-        "height": 2114733
+        "height": 2114733,
+        "hash": "f9b02bc5bfbc48d55a8850f8f34a692bc122d3de9f0f64bbbdd1b88f5918efe5"
     }
 }
 ```

@@ -1,8 +1,18 @@
 import {relations} from 'drizzle-orm'
 import {customType, index, integer, pgTable} from 'drizzle-orm/pg-core'
+import {logger} from '../logger'
 
 const bytea = customType<{data: Buffer}>({
   dataType: () => 'bytea',
+  fromDriver(val) {
+    if (Buffer.isBuffer(val)) return val
+    // Drizzle-ORM returns bytea columns in joined tables as hex strings with \x prefix
+    if (typeof val === 'string' && val.startsWith('\\x'))
+      return Buffer.from(val.substring(2), 'hex')
+
+    logger.error({val}, 'Unexpected value for bytea')
+    throw new Error(`Unexpected value for bytea: ${val}`)
+  },
 })
 
 export const blocks = pgTable('block', {
