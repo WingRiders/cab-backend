@@ -7,6 +7,7 @@ jobs:
   mirror:
     name: Mirror commits to public repo
     runs-on: ubuntu-latest
+    if: github.repository != 'WingRiders/cab-backend' # Prevent execution in the public repo
 
     steps:
       - name: Checkout
