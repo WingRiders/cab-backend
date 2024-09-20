@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@cardano-ogmios/client": "^6.6.2",
+    "@elysiajs/cors": "^1.1.1",
     "@sinclair/typebox": "^0.32.18",
     "bech32": "^2.0.0",
     "drizzle-orm": "^0.30.6",

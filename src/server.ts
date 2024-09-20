@@ -1,3 +1,4 @@
+import cors from '@elysiajs/cors'
 import {Elysia, mapResponse, t} from 'elysia'
 import JSONbig from 'json-bigint'
 import {
@@ -18,6 +19,12 @@ import {submitTx} from './ogmios/submit'
 const {stringify} = JSONbig({useNativeBigInt: true})
 
 export const baseApp = new Elysia()
+  .use(
+    cors({
+      origin: '*',
+      methods: ['GET', 'POST'],
+    }),
+  )
   // Get healthstatus, just reports if the service is up
   .get('/healthstatus', () => ({status: 'ok'}))
 
