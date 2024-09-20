@@ -2,13 +2,6 @@ import {describe, expect, it} from 'bun:test'
 
 describe('Config', () => {
   it('returns correct config with default values', async () => {
-    // make env the minimal config
-    process.env = {
-      DB_USER: 'user',
-      DB_PASSWORD: 'password',
-      DB_NAME: 'db_name',
-    }
-
     // after changing the env load the config
     const {config} = await import('../src/config')
 
