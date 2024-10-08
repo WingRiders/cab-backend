@@ -7,6 +7,7 @@ import {
   getLastBlock,
   transactionByTxHash,
 } from './db/db'
+import {parseUtxoId} from './helpers'
 import {
   getLedgerTip,
   getNetworkTip,
@@ -77,13 +78,29 @@ export const app = new Elysia()
   // Get ledger tip
   .get('/ledgerTip', () => getLedgerTip())
 
-  // Get UTxOs for given addresses, optionally tied to a specific slot
-  .get('/utxos', ({query: {addresses}}) => getUTxOs({addresses}), {
-    query: t.Object({addresses: t.Array(t.String())}),
-    transform: ({query}) => {
-      query.addresses = (query.addresses as unknown as string).split(',')
+  // Get UTxOs for given addresses or references
+  .get(
+    '/utxos',
+    ({query: {addresses, references}}) => {
+      if (addresses && references)
+        throw new Error('Only one of addresses or references can be provided')
+
+      if (addresses) return getUTxOs({addresses})
+      if (references) return getUTxOs({outputReferences: references.map(parseUtxoId)})
+
+      throw new Error('Either addresses or references must be provided')
     },
-  })
+    {
+      query: t.Object({
+        addresses: t.Optional(t.Array(t.String())),
+        references: t.Optional(t.Array(t.String())),
+      }),
+      transform: ({query}) => {
+        query.addresses = (query.addresses as unknown as string | undefined)?.split(',')
+        query.references = (query.references as unknown as string | undefined)?.split(',')
+      },
+    },
+  )
 
   // Get stake key info - rewards, delegated, stake pool id
   .get('/rewardAccountSummary/:stakeKeyHash', async ({params: {stakeKeyHash}, set}) => {
