@@ -71,12 +71,13 @@ In our experience separating services these way proved useful, as it enables eas
 ```
 Return protocol parameters obtained from Ogmios, the returned type corresponds to `ProtocolParameters` from [`@cardano-ogmios/schema`](https://github.com/CardanoSolutions/ogmios/tree/master/clients/TypeScript/packages/schema)
 
-### Get UTxOs for addresses
+### Get UTxOs for addresses or references
 #### Request
-`GET /utxos?addresses=addr...,addr...`
+`GET /utxos?addresses=addr...,addr...` or `GET /utxos?references=txHash#index,txHash#index`
 
 **Query:**
 - `addresses` - Array of addresses in BECH32 form or in hexadecimal format, separated by commas `,`
+- `references` - Array of utxo utxos references in format `{txHash}#{index}`, separated by commas `,`
 
 #### Response
 **Code:** 200
