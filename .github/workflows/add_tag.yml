@@ -1,0 +1,46 @@
+name: Add Tag to Public Repo
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag: { description: "Tag to add", required: true }
+
+jobs:
+  add-tag:
+    name: Add Tag to Public Repo
+    runs-on: ubuntu-latest
+    if: github.repository != 'WingRiders/cab-backend' # Prevent execution in the public repo
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Import SSH key
+        shell: bash
+        env:
+          TECHRIDER_SSH_PUBLIC_KEY: ${{ secrets.TECHRIDER_SSH_PUBLIC_KEY }}
+          TECHRIDER_SSH_PRIVATE_KEY: ${{ secrets.TECHRIDER_SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$TECHRIDER_SSH_PUBLIC_KEY" >~/.ssh/id_ed25519.pub
+          echo "$TECHRIDER_SSH_PRIVATE_KEY" >~/.ssh/id_ed25519
+          chmod 700 ~/.ssh
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/id_ed25519.pub
+
+      - name: Fetch public remote
+        shell: bash
+        run: |
+          git remote add public git@github.com:WingRiders/cab-backend.git
+          git fetch public main
+
+      - name: Push tag to public repo
+        shell: bash
+        env:
+          TAG: ${{ github.event.inputs.tag }}
+        run: |
+          git config --local user.name "TechRiderWR"
+          git config --local user.email "techrider@wingriders.com"
+          git tag $TAG
+          git push public $TAG
