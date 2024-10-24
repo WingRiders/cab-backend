@@ -6,13 +6,13 @@ import {
   filterUsedAddresses,
   getLastBlock,
   transactionByTxHash,
+  utxosByAddresses,
+  utxosByReferences,
 } from './db/db'
-import {parseUtxoId} from './helpers'
 import {
   getLedgerTip,
   getNetworkTip,
   getRewardAccountSummary,
-  getUTxOs,
   protocolParameters,
 } from './ogmios/ledgerStateQuery'
 import {submitTx} from './ogmios/submit'
@@ -65,7 +65,9 @@ export const app = new Elysia()
     if (typeof response === 'object') {
       return mapResponse(
         stringify(response, (_, v) =>
-          typeof v === 'object' && v.type === 'Buffer' ? Buffer.from(v.data).toString('hex') : v,
+          typeof v === 'object' && v !== null && v.type === 'Buffer'
+            ? Buffer.from(v.data).toString('hex')
+            : v,
         ),
         {...set, headers: {'Content-Type': 'application/json'}},
       )
@@ -78,15 +80,15 @@ export const app = new Elysia()
   // Get ledger tip
   .get('/ledgerTip', () => getLedgerTip())
 
-  // Get UTxOs for given addresses or references
+  // Get UTxOs for given shelley bech32 addresses or references
   .get(
     '/utxos',
     ({query: {addresses, references}}) => {
       if (addresses && references)
         throw new Error('Only one of addresses or references can be provided')
 
-      if (addresses) return getUTxOs({addresses})
-      if (references) return getUTxOs({outputReferences: references.map(parseUtxoId)})
+      if (addresses) return utxosByAddresses(addresses)
+      if (references) return utxosByReferences(references)
 
       throw new Error('Either addresses or references must be provided')
     },

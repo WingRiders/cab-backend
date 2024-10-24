@@ -1,5 +1,5 @@
 import {relations} from 'drizzle-orm'
-import {customType, index, integer, pgTable} from 'drizzle-orm/pg-core'
+import {customType, index, integer, jsonb, pgTable, varchar} from 'drizzle-orm/pg-core'
 import {logger} from '../logger'
 
 const bytea = customType<{data: Buffer}>({
@@ -59,3 +59,28 @@ export const addresses = pgTable(
 )
 
 export type NewAddress = typeof addresses.$inferInsert
+
+export const transactionOutputs = pgTable(
+  'transaction_output',
+  {
+    utxoId: varchar('utxo_id').primaryKey(),
+    ogmiosUtxo: jsonb('ogmios_utxo').notNull(),
+    slot: integer('slot').notNull(),
+    spendSlot: integer('spend_slot'),
+    address: varchar('address').notNull(),
+  },
+  (table) => ({
+    addressIdx: index('address_idx').on(table.address),
+  }),
+)
+
+// Define relations for transactionOutput
+export const transactionOutputsRelations = relations(transactionOutputs, ({one}) => ({
+  block: one(blocks, {fields: [transactionOutputs.slot], references: [blocks.slot]}),
+  spendBlock: one(blocks, {fields: [transactionOutputs.spendSlot], references: [blocks.slot]}),
+}))
+
+// We stringify the JSONB structure before adding to the buffer to prevent null-byte error in the unnest interpolation
+export type NewTxOutput = Omit<typeof transactionOutputs.$inferInsert, 'ogmiosUtxo'> & {
+  ogmiosUtxo: string
+}
