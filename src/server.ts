@@ -1,3 +1,4 @@
+import type {Point} from '@cardano-ogmios/schema'
 import cors from '@elysiajs/cors'
 import {Elysia, mapResponse, t} from 'elysia'
 import JSONbig from 'json-bigint'
@@ -9,6 +10,7 @@ import {
   utxosByAddresses,
   utxosByReferences,
 } from './db/db'
+import {originPoint} from './helpers.ts'
 import {
   getLedgerTip,
   getNetworkTip,
@@ -32,9 +34,10 @@ export const baseApp = new Elysia()
   // Get health of the service
   .get('/healthcheck', async ({set}) => {
     // Check sync status
+    const tipToSlot = (tip: Point | 'origin') => (tip === 'origin' ? originPoint.slot : tip.slot)
     const [networkSlot, ledgerSlot, lastBlockSlot] = await Promise.all([
-      getNetworkTip().then((tip) => (tip === 'origin' ? 0 : tip.slot)),
-      getLedgerTip().then((tip) => (tip === 'origin' ? 0 : tip.slot)),
+      getNetworkTip().then(tipToSlot),
+      getLedgerTip().then(tipToSlot),
       getLastBlock().then((block) => (block ? block.slot : 0)),
     ])
     const healthyThresholdSlot = 10

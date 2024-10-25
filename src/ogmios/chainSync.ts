@@ -13,7 +13,7 @@ import {
   transactionOutputs,
   transactions,
 } from '../db/schema'
-import {bechAddressToHex} from '../helpers.ts'
+import {bechAddressToHex, originPoint} from '../helpers.ts'
 import {logger} from '../logger'
 import {getContext} from './ogmios'
 
@@ -65,7 +65,7 @@ const processBlock = async (block: BlockPraos) => {
 }
 
 const processRollback = async (point: 'origin' | Point) => {
-  const rollbackSlot = point === 'origin' ? 0 : point.slot
+  const rollbackSlot = point === 'origin' ? originPoint.slot : point.slot
   await db.transaction((tx) =>
     Promise.all([
       tx.delete(blocks).where(gte(blocks.slot, rollbackSlot)),
@@ -234,7 +234,7 @@ const writeBuffersIfNecessary = async ({
 // rollbacks) or default to origin
 const findIntersect = async () => {
   const dbBlock = await db.query.blocks.findFirst({orderBy: [desc(blocks.slot)], offset: 10})
-  return dbBlock ? {id: dbBlock.hash.toString('hex'), slot: dbBlock.slot} : 'origin'
+  return dbBlock ? {id: dbBlock.hash.toString('hex'), slot: dbBlock.slot} : originPoint
 }
 
 // Start the chain sync client, and add a listener on the underlying socket - connection to Ogmios
@@ -263,7 +263,7 @@ export const startChainSyncClient = async () => {
           await writeBuffersIfNecessary({latestHeight: response.tip.height, threshold: 1})
         } else {
           await writeBuffersIfNecessary({
-            latestHeight: response.tip === 'origin' ? 0 : response.tip.height,
+            latestHeight: response.tip === 'origin' ? originPoint.height : response.tip.height,
             threshold: BUFFER_SIZE,
           })
         }
@@ -275,7 +275,7 @@ export const startChainSyncClient = async () => {
       logger.trace({point: response.point}, 'Roll backward')
       await writeBuffersIfNecessary({
         threshold: 1,
-        rollbackToSlot: response.point === 'origin' ? 0 : response.point.slot,
+        rollbackToSlot: response.point === 'origin' ? originPoint.slot : response.point.slot,
       })
       await processRollback(response.point)
       nextBlock()
