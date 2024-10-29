@@ -40,7 +40,7 @@ export const baseApp = new Elysia()
       getLedgerTip().then(tipToSlot),
       getLastBlock().then((block) => (block ? block.slot : 0)),
     ])
-    const healthyThresholdSlot = 10
+    const healthyThresholdSlot = 300 // 5 minutes
     const healthy =
       networkSlot - ledgerSlot < healthyThresholdSlot &&
       ledgerSlot - lastBlockSlot < healthyThresholdSlot

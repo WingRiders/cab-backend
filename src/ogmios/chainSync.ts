@@ -94,11 +94,11 @@ let spentTxOutputBuffer: {utxoId: string; spendSlot: number}[] = []
 
 // Write buffers into DB
 const writeBuffersIfNecessary = async ({
-  latestHeight,
+  latestLedgerHeight,
   threshold,
   rollbackToSlot,
 }: {
-  latestHeight?: number
+  latestLedgerHeight?: number
   threshold: number
   rollbackToSlot?: number
 }) => {
@@ -112,20 +112,29 @@ const writeBuffersIfNecessary = async ({
     txOutputBuffer.length >= threshold ||
     spentTxOutputBuffer.length >= threshold
   ) {
-    const stats = {
-      blocks: '0/0',
-      transactions: '0/0',
-      addresses: '0/0',
-      transactionOutputs: '0/0',
-      spentTxOutputs: '0/0',
-      deletedImmutablySpentTxOutputs: '0',
-      utxoSet: '0',
-      spentTxos: '0',
-      latestSlot: 0 as number | undefined,
-      ...(latestHeight
-        ? {progress: (blockBuffer[blockBuffer.length - 1]?.height || 1) / latestHeight}
-        : {}),
+    const latestBlock = blockBuffer[blockBuffer.length - 1]
+    const latestSlot = latestBlock?.slot
+    const statsBeforeDbWrite = {
+      blocks: blockBuffer.length,
+      transactions: txBuffer.length,
+      addresses: addressBuffer.length,
+      transactionOutputs: txOutputBuffer.length,
+      txOutputsToSpend: spentTxOutputBuffer.length,
+      latestSlot,
+      ...(latestLedgerHeight ? {progress: (latestBlock?.height || 1) / latestLedgerHeight} : {}),
       rollbackToSlot,
+    }
+
+    logger.debug(statsBeforeDbWrite, 'Start writing buffers to DB')
+
+    // Stats which will be set in the SQL transaction
+    const stats = {
+      ...statsBeforeDbWrite,
+      newAddresses: 0,
+      spentTxOutputs: 0,
+      deletedImmutablySpentTxOutputs: 0,
+      utxoSet: 0,
+      spentTxos: 0,
     }
 
     // Do the inserts in one transaction to ensure data doesn't get corrupted if the
@@ -133,46 +142,35 @@ const writeBuffersIfNecessary = async ({
     await sql.begin(async (sql) => {
       // Inserting data with unnest ensures that the query is stable and reduces the
       // amount of time it takes to parse the query.
-      const blocks = await sql`
+      await sql`
           INSERT INTO block (slot, hash, height)
           SELECT *
           FROM unnest(
                   ${sql.array(blockBuffer.map(({slot}) => slot))}::integer[],
                   ${sql.array(blockBuffer.map(({hash}) => hash))}::bytea[],
                   ${sql.array(blockBuffer.map(({height}) => height))}::integer[])`
-      stats.blocks = `${blocks.count}/${blockBuffer.length}`
 
       if (txBuffer.length > 0) {
-        const txs = await sql`
+        await sql`
             INSERT INTO transaction (tx_hash, slot)
             SELECT *
             FROM unnest(
                     ${sql.array(txBuffer.map(({txHash}) => txHash))}::bytea[],
                     ${sql.array(txBuffer.map(({slot}) => slot))}::integer[])`
-        stats.transactions = `${txs.count}/${txBuffer.length}`
 
         // Addresses might repeat, so `ON CONFLICT DO NOTHING` skips any duplicates and keeps
         // the first address only in the DB
-        const addresses = await sql`
+        const newAddresses = await sql`
             INSERT INTO address (address, first_slot)
             SELECT *
             FROM unnest(
                     ${sql.array(addressBuffer.map(({address}) => address))}::bytea[],
                     ${sql.array(addressBuffer.map(({firstSlot}) => firstSlot))}::integer[])
             ON CONFLICT DO NOTHING`
-        stats.addresses = `${addresses.count}/${addressBuffer.length}`
+        stats.newAddresses = newAddresses.count
 
         if (txOutputBuffer.length > 0) {
-          logger.trace(
-            txOutputBuffer.map((t) => ({
-              utxoId: t.utxoId,
-              slot: t.slot,
-              spendSlot: t.spendSlot,
-              address: t.address,
-              ogmiosUtxo: t.ogmiosUtxo,
-            })),
-          )
-          const txOutputs = await sql`
+          await sql`
               INSERT INTO transaction_output (utxo_id, slot, spend_slot, address, ogmios_utxo)
               SELECT *
               FROM unnest(
@@ -182,7 +180,6 @@ const writeBuffersIfNecessary = async ({
                       ${sql.array(txOutputBuffer.map(({address}) => address))}::varchar[],
                       ${sql.array(txOutputBuffer.map(({ogmiosUtxo}) => ogmiosUtxo))}::jsonb[]
                    )`
-          stats.transactionOutputs = `${txOutputs.count}/${txOutputBuffer.length}`
         }
         if (spentTxOutputBuffer.length > 0) {
           const spentTxOutputs = await sql`
@@ -191,7 +188,7 @@ const writeBuffersIfNecessary = async ({
               FROM (SELECT unnest(${sql.array(spentTxOutputBuffer.map(({utxoId}) => utxoId))}::varchar[])              AS utxo_id,
                            unnest(${sql.array(spentTxOutputBuffer.map(({spendSlot}) => spendSlot))}::integer[]) AS spendSlot) AS u
               WHERE transaction_output.utxo_id = u.utxo_id;`
-          stats.spentTxOutputs = `${spentTxOutputs.count}/${spentTxOutputBuffer.length}`
+          stats.spentTxOutputs = spentTxOutputs.count
         }
       }
 
@@ -203,7 +200,7 @@ const writeBuffersIfNecessary = async ({
           SELECT COUNT(*)
           FROM transaction_output
           WHERE spend_slot IS NOT NULL`
-      const latestSlot = blockBuffer[blockBuffer.length - 1]?.slot
+
       if (latestSlot && !rollbackToSlot) {
         const deletedImmutablySpentTxOutputs = await sql`
             WITH deleted
@@ -212,12 +209,11 @@ const writeBuffersIfNecessary = async ({
                      } RETURNING *)
             SELECT COUNT(*) as count
             FROM deleted`
-        stats.deletedImmutablySpentTxOutputs = `${deletedImmutablySpentTxOutputs[0]?.count}`
+        stats.deletedImmutablySpentTxOutputs = deletedImmutablySpentTxOutputs[0]?.count
       }
 
-      stats.utxoSet = `${unspent[0]?.count}`
-      stats.spentTxos = `${spent[0]?.count}`
-      stats.latestSlot = latestSlot
+      stats.utxoSet = unspent[0]?.count
+      stats.spentTxos = spent[0]?.count
     })
 
     logger.info(stats, 'Wrote buffers to DB')
@@ -254,16 +250,20 @@ export const startChainSyncClient = async () => {
     async rollForward(response, nextBlock) {
       // Skip Byron blocks, we are not interested in those addresses
       if (response.block.era !== 'byron') {
-        logger.trace({slot: response.block.height, era: response.block.era}, 'Roll forward')
+        logger.trace(
+          {slot: response.block.slot, height: response.block.height, era: response.block.era},
+          'Roll forward',
+        )
 
         await processBlock(response.block)
 
         // Decide if to use buffering based on proximity to ledger tip
         if (response.tip !== 'origin' && response.tip.height - 10 < response.block.height) {
-          await writeBuffersIfNecessary({latestHeight: response.tip.height, threshold: 1})
+          await writeBuffersIfNecessary({latestLedgerHeight: response.tip.height, threshold: 1})
         } else {
           await writeBuffersIfNecessary({
-            latestHeight: response.tip === 'origin' ? originPoint.height : response.tip.height,
+            latestLedgerHeight:
+              response.tip === 'origin' ? originPoint.height : response.tip.height,
             threshold: BUFFER_SIZE,
           })
         }
