@@ -43,6 +43,13 @@
       "when": 1729677651769,
       "tag": "0005_shiny_bucky",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1730205620256,
+      "tag": "0006_bumpy_colonel_america",
+      "breakpoints": true
     }
   ]
 }

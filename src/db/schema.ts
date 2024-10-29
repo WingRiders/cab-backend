@@ -71,6 +71,7 @@ export const transactionOutputs = pgTable(
   },
   (table) => ({
     addressIdx: index('address_idx').on(table.address),
+    spendSlotIdx: index('spend_slot_idx').on(table.spendSlot),
   }),
 )
 
