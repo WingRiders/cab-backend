@@ -133,8 +133,6 @@ const writeBuffersIfNecessary = async ({
       newAddresses: 0,
       spentTxOutputs: 0,
       deletedImmutablySpentTxOutputs: 0,
-      utxoSet: 0,
-      spentTxos: 0,
     }
 
     // Do the inserts in one transaction to ensure data doesn't get corrupted if the
@@ -192,15 +190,6 @@ const writeBuffersIfNecessary = async ({
         }
       }
 
-      const unspent = await sql`
-          SELECT COUNT(*)
-          FROM transaction_output
-          WHERE spend_slot IS NULL`
-      const spent = await sql`
-          SELECT COUNT(*)
-          FROM transaction_output
-          WHERE spend_slot IS NOT NULL`
-
       if (latestSlot && !rollbackToSlot) {
         const deletedImmutablySpentTxOutputs = await sql`
             WITH deleted
@@ -211,9 +200,6 @@ const writeBuffersIfNecessary = async ({
             FROM deleted`
         stats.deletedImmutablySpentTxOutputs = deletedImmutablySpentTxOutputs[0]?.count
       }
-
-      stats.utxoSet = unspent[0]?.count
-      stats.spentTxos = spent[0]?.count
     })
 
     logger.info(stats, 'Wrote buffers to DB')
