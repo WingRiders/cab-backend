@@ -1,6 +1,6 @@
 import {createChainSynchronizationClient} from '@cardano-ogmios/client'
 import type {BlockPraos, Point, Transaction} from '@cardano-ogmios/schema'
-import {and, desc, gte, lt} from 'drizzle-orm'
+import {and, desc, gt, lt, lte} from 'drizzle-orm'
 import {stringify} from 'json-bigint'
 import {db, sql} from '../db/db'
 import {
@@ -68,17 +68,17 @@ const processRollback = async (point: 'origin' | Point) => {
   const rollbackSlot = point === 'origin' ? originPoint.slot : point.slot
   await db.transaction((tx) =>
     Promise.all([
-      tx.delete(blocks).where(gte(blocks.slot, rollbackSlot)),
-      tx.delete(transactions).where(gte(transactions.slot, rollbackSlot)),
-      tx.delete(addresses).where(gte(addresses.firstSlot, rollbackSlot)),
-      tx.delete(transactionOutputs).where(gte(transactionOutputs.slot, rollbackSlot)),
+      tx.delete(blocks).where(gt(blocks.slot, rollbackSlot)),
+      tx.delete(transactions).where(gt(transactions.slot, rollbackSlot)),
+      tx.delete(addresses).where(gt(addresses.firstSlot, rollbackSlot)),
+      tx.delete(transactionOutputs).where(gt(transactionOutputs.slot, rollbackSlot)),
       tx
         .update(transactionOutputs)
         .set({spendSlot: null})
         .where(
           and(
-            gte(transactionOutputs.spendSlot, rollbackSlot),
-            lt(transactionOutputs.slot, rollbackSlot),
+            gt(transactionOutputs.spendSlot, rollbackSlot),
+            lte(transactionOutputs.slot, rollbackSlot),
           ),
         ),
     ]),
