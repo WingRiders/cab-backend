@@ -65,6 +65,7 @@ const processBlock = async (block: BlockPraos) => {
 }
 
 const processRollback = async (point: 'origin' | Point) => {
+  logger.info(point, 'Rollback')
   const rollbackSlot = point === 'origin' ? originPoint.slot : point.slot
   await db.transaction((tx) =>
     Promise.all([
