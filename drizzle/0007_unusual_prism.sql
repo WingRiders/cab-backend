@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "transaction_output_slot_idx" ON "transaction_output" ("slot");
