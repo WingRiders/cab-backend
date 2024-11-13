@@ -1,6 +1,7 @@
 import {type Static, Type, type UnsafeOptions} from '@sinclair/typebox'
 import envSchema from 'env-schema'
 import pino from 'pino'
+import {originPoint} from './helpers.ts'
 
 const StringEnum = <T extends string[]>(
   values: [...T],
@@ -27,11 +28,22 @@ const Env = Type.Object({
   DB_PASSWORD: Type.String(),
   DB_NAME: Type.String(),
   DB_SCHEMA: Type.String({default: 'cab_backend'}),
+  FIXUP_MISSING_BLOCKS: Type.Optional(Type.String()), // Comma-separated numbers
 })
 
-const unwrapEnv = () => {
+const unwrapEnv = (): Omit<Static<typeof Env>, 'FIXUP_MISSING_BLOCKS'> & {
+  FIXUP_MISSING_BLOCKS: Set<number>
+} => {
   try {
-    return envSchema<Static<typeof Env>>({schema: Env})
+    const rawEnv = envSchema<Static<typeof Env>>({schema: Env})
+    return {
+      ...rawEnv,
+      FIXUP_MISSING_BLOCKS: new Set(
+        rawEnv.FIXUP_MISSING_BLOCKS?.split(',')
+          .map(Number)
+          .filter((height) => height > 0) ?? [],
+      ),
+    }
   } catch (error) {
     // cannot reuse logger here as it requires config to initialize
     pino({name: 'cab-backend'}).error(error)

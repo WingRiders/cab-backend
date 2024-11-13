@@ -1,7 +1,8 @@
 import {createChainSynchronizationClient} from '@cardano-ogmios/client'
 import type {BlockPraos, Point, Transaction} from '@cardano-ogmios/schema'
-import {and, desc, gt, lt, lte} from 'drizzle-orm'
+import {and, desc, eq, gt, inArray, isNull, lt, lte} from 'drizzle-orm'
 import {stringify} from 'json-bigint'
+import {config} from '../config.ts'
 import {db, sql} from '../db/db'
 import {
   type NewAddress,
@@ -25,6 +26,15 @@ const isShelleyAddress = (address: string) => address.startsWith('addr')
 
 // Aggregation logic is here
 const processBlock = async (block: BlockPraos) => {
+  if (
+    config.FIXUP_MISSING_BLOCKS.size > 0 &&
+    !config.FIXUP_MISSING_BLOCKS.has(block.height) &&
+    originalIntersectSlot &&
+    block.slot <= originalIntersectSlot
+  ) {
+    // In fixup mode: Do nothing for blocks that are not missing
+    return
+  }
   blockBuffer.push({slot: block.slot, hash: Buffer.from(block.id, 'hex'), height: block.height})
 
   const transactions: Transaction[] = block.transactions ?? []
@@ -44,14 +54,18 @@ const processBlock = async (block: BlockPraos) => {
       }
       addressBuffer.push(newAddress)
 
+      const utxoId = `${tx.id}#${outputIndex}`
       const newTxOutput: NewTxOutput = {
-        utxoId: `${tx.id}#${outputIndex}`,
+        utxoId,
         slot: block.slot,
         spendSlot: null,
         address: output.address,
         ogmiosUtxo: stringify({transaction: {id: tx.id}, index: outputIndex, ...output}),
       }
       txOutputBuffer.push(newTxOutput)
+      if (config.FIXUP_MISSING_BLOCKS.size > 0) {
+        fixupUtxoIds.add(utxoId)
+      }
 
       outputIndex += 1
     }
@@ -67,6 +81,14 @@ const processBlock = async (block: BlockPraos) => {
 const processRollback = async (point: 'origin' | Point) => {
   logger.info(point, 'Rollback')
   const rollbackSlot = point === 'origin' ? originPoint.slot : point.slot
+  if (
+    config.FIXUP_MISSING_BLOCKS.size > 0 &&
+    originalIntersectSlot &&
+    rollbackSlot < originalIntersectSlot
+  ) {
+    logger.info({originalIntersectSlot}, "Fixup - Won't delete blocks before originalIntersectSlot")
+    return
+  }
   await db.transaction((tx) =>
     Promise.all([
       tx.delete(blocks).where(gt(blocks.slot, rollbackSlot)),
@@ -92,6 +114,10 @@ let txBuffer: NewTx[] = []
 let addressBuffer: NewAddress[] = []
 let txOutputBuffer: NewTxOutput[] = []
 let spentTxOutputBuffer: {utxoId: string; spendSlot: number}[] = []
+// Tx outputs of filled blocks to help deciding when to set spend_slot
+let fixupUtxoIds: Set<string> = new Set()
+// Where to stop fixup and start processing full blocks
+let originalIntersectSlot: number | null
 
 // Write buffers into DB
 const writeBuffersIfNecessary = async ({
@@ -147,7 +173,8 @@ const writeBuffersIfNecessary = async ({
           FROM unnest(
                   ${sql.array(blockBuffer.map(({slot}) => slot))}::integer[],
                   ${sql.array(blockBuffer.map(({hash}) => hash))}::bytea[],
-                  ${sql.array(blockBuffer.map(({height}) => height))}::integer[])`
+                  ${sql.array(blockBuffer.map(({height}) => height))}::integer[])
+          ON CONFLICT DO NOTHING`
 
       if (txBuffer.length > 0) {
         await sql`
@@ -155,7 +182,8 @@ const writeBuffersIfNecessary = async ({
             SELECT *
             FROM unnest(
                     ${sql.array(txBuffer.map(({txHash}) => txHash))}::bytea[],
-                    ${sql.array(txBuffer.map(({slot}) => slot))}::integer[])`
+                    ${sql.array(txBuffer.map(({slot}) => slot))}::integer[])
+            ON CONFLICT DO NOTHING`
 
         // Addresses might repeat, so `ON CONFLICT DO NOTHING` skips any duplicates and keeps
         // the first address only in the DB
@@ -178,13 +206,14 @@ const writeBuffersIfNecessary = async ({
                       ${sql.array(txOutputBuffer.map(({spendSlot}) => spendSlot ?? null))}::integer[],
                       ${sql.array(txOutputBuffer.map(({address}) => address))}::varchar[],
                       ${sql.array(txOutputBuffer.map(({ogmiosUtxo}) => ogmiosUtxo))}::jsonb[]
-                   )`
+                   )
+              ON CONFLICT DO NOTHING`
         }
         if (spentTxOutputBuffer.length > 0) {
           const spentTxOutputs = await sql`
               UPDATE transaction_output
               SET spend_slot = u.spendSlot
-              FROM (SELECT unnest(${sql.array(spentTxOutputBuffer.map(({utxoId}) => utxoId))}::varchar[])              AS utxo_id,
+              FROM (SELECT unnest(${sql.array(spentTxOutputBuffer.map(({utxoId}) => utxoId))}::varchar[])       AS utxo_id,
                            unnest(${sql.array(spentTxOutputBuffer.map(({spendSlot}) => spendSlot))}::integer[]) AS spendSlot) AS u
               WHERE transaction_output.utxo_id = u.utxo_id;`
           stats.spentTxOutputs = spentTxOutputs.count
@@ -214,9 +243,19 @@ const writeBuffersIfNecessary = async ({
 }
 
 // Find starting point for Ogmios, either 10th latest block (to prevent issues in case of
-// rollbacks) or default to origin
+// rollbacks or default to origin
 const findIntersect = async () => {
   const dbBlock = await db.query.blocks.findFirst({orderBy: [desc(blocks.slot)], offset: 10})
+  return dbBlock ? {id: dbBlock.hash.toString('hex'), slot: dbBlock.slot} : originPoint
+}
+
+// Find starting point for Ogmios, last block before the first missing block
+const findIntersectForFixup = async (oldestMissingBlockHeight: number) => {
+  logger.trace({oldestMissingBlockHeight}, 'findIntersectForFixup')
+  const dbBlock = await db.query.blocks.findFirst({
+    where: lt(blocks.height, oldestMissingBlockHeight),
+    orderBy: [desc(blocks.slot)],
+  })
   return dbBlock ? {id: dbBlock.hash.toString('hex'), slot: dbBlock.slot} : originPoint
 }
 
@@ -231,6 +270,21 @@ export const startChainSyncClient = async () => {
   txOutputBuffer = []
   spentTxOutputBuffer = []
 
+  if (config.FIXUP_MISSING_BLOCKS.size > 0) {
+    const utxoIdsInFilledBlocks = await db
+      .select({utxoId: transactionOutputs.utxoId})
+      .from(transactionOutputs)
+      .innerJoin(blocks, eq(transactionOutputs.slot, blocks.slot))
+      .where(
+        and(
+          inArray(blocks.height, [...config.FIXUP_MISSING_BLOCKS]),
+          isNull(transactionOutputs.spendSlot),
+        ),
+      )
+    logger.info(`Fixup - initializing fixupUtxoIds with ${utxoIdsInFilledBlocks.length} entries`)
+    fixupUtxoIds = new Set(utxoIdsInFilledBlocks.map(({utxoId}) => utxoId))
+  }
+
   const context = await getContext()
 
   const chainSyncClient = await createChainSynchronizationClient(context, {
@@ -244,15 +298,38 @@ export const startChainSyncClient = async () => {
 
         await processBlock(response.block)
 
+        const latestLedgerHeight =
+          response.tip === 'origin' ? originPoint.height : response.tip.height
+
         // Decide if to use buffering based on proximity to ledger tip
-        if (response.tip !== 'origin' && response.tip.height - 10 < response.block.height) {
-          await writeBuffersIfNecessary({latestLedgerHeight: response.tip.height, threshold: 1})
-        } else {
-          await writeBuffersIfNecessary({
-            latestLedgerHeight:
-              response.tip === 'origin' ? originPoint.height : response.tip.height,
-            threshold: BUFFER_SIZE,
-          })
+        // No buffering in fixup mode
+        const threshold =
+          config.FIXUP_MISSING_BLOCKS.size > 0 ||
+          (response.tip !== 'origin' && response.tip.height - 10 < response.block.height)
+            ? 1
+            : BUFFER_SIZE
+        await writeBuffersIfNecessary({latestLedgerHeight, threshold})
+
+        if (config.FIXUP_MISSING_BLOCKS.size > 0) {
+          const spentUtxoIds =
+            response.block.transactions?.flatMap((tx) =>
+              tx.inputs.map((input) => `${input.transaction.id}#${input.index}`),
+            ) ?? []
+          const spentUtxoIdsInFixupBlocks = spentUtxoIds.filter((utxoId) =>
+            fixupUtxoIds.has(utxoId),
+          )
+          if (spentUtxoIdsInFixupBlocks.length > 0) {
+            logger.info(
+              `Fixup - Setting spend_slot=${response.block.slot} for ${spentUtxoIdsInFixupBlocks.length} outputs in missing blocks`,
+            )
+            await db
+              .update(transactionOutputs)
+              .set({spendSlot: response.block.slot})
+              .where(inArray(transactionOutputs.utxoId, spentUtxoIdsInFixupBlocks))
+            for (const utxoId of spentUtxoIdsInFixupBlocks) {
+              fixupUtxoIds.delete(utxoId)
+            }
+          }
         }
       }
       nextBlock()
@@ -269,9 +346,15 @@ export const startChainSyncClient = async () => {
     },
   })
 
-  // Start the chain sync client from the latest intersect, and rollback to it first
-  const intersect = await findIntersect()
+  // Rollback to latest intersect first
+  let intersect = await findIntersect()
   await processRollback(intersect)
+  if (config.FIXUP_MISSING_BLOCKS.size > 0) {
+    originalIntersectSlot = intersect.slot
+    const oldestMissingBlockHeight = Math.min(...config.FIXUP_MISSING_BLOCKS)
+    intersect = await findIntersectForFixup(oldestMissingBlockHeight)
+    logger.info({intersectForFixup: intersect, originalIntersectSlot}, 'Fixup - found intersects')
+  }
   logger.info({intersect}, 'Ogmios - resuming chainSyncClient')
   await chainSyncClient.resume([intersect], 100)
 

@@ -379,3 +379,22 @@ bun fix
 <a href="https://medium.com/@wingriderscom">Medium</a>
 </p>
 
+### Fixup process
+
+In case some blocks are missing, there is a fixup process to fill missing blocks.
+
+First, detect which blocks are missing:
+```sql
+SELECT all_heights.height
+FROM generate_series(
+             (SELECT MIN(height) FROM block),
+             (SELECT MAX(height) FROM block)
+     ) AS all_heights(height)
+         LEFT JOIN block AS b ON b.height = all_heights.height
+WHERE b.height IS NULL
+ORDER BY all_heights.height;
+```
+
+Then, set the env var `FIXUP_MISSING_BLOCKS=` with comma-separated heights of the missing blocks and restart cab-backend.
+
+When there are no more gaps, restart cab-backend with unset `FIXUP_MISSING_BLOCKS`.
