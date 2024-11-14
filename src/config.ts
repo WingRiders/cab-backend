@@ -43,6 +43,10 @@ const unwrapEnv = (): Omit<Static<typeof Env>, 'FIXUP_MISSING_BLOCKS'> & {
           .map(Number)
           .filter((height) => height > 0) ?? [],
       ),
+      FIXUP_CONTINUE_FROM_HEIGHT:
+        rawEnv.FIXUP_CONTINUE_FROM_HEIGHT && rawEnv.FIXUP_CONTINUE_FROM_HEIGHT > 0
+          ? rawEnv.FIXUP_CONTINUE_FROM_HEIGHT
+          : undefined,
     }
   } catch (error) {
     // cannot reuse logger here as it requires config to initialize
