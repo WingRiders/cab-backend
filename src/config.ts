@@ -1,7 +1,6 @@
 import {type Static, Type, type UnsafeOptions} from '@sinclair/typebox'
 import envSchema from 'env-schema'
 import pino from 'pino'
-import {originPoint} from './helpers.ts'
 
 const StringEnum = <T extends string[]>(
   values: [...T],
@@ -29,6 +28,7 @@ const Env = Type.Object({
   DB_NAME: Type.String(),
   DB_SCHEMA: Type.String({default: 'cab_backend'}),
   FIXUP_MISSING_BLOCKS: Type.Optional(Type.String()), // Comma-separated numbers
+  FIXUP_CONTINUE_FROM_HEIGHT: Type.Optional(Type.Number()),
 })
 
 const unwrapEnv = (): Omit<Static<typeof Env>, 'FIXUP_MISSING_BLOCKS'> & {

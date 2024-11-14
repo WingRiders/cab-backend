@@ -250,10 +250,14 @@ const findIntersect = async () => {
 }
 
 // Find starting point for Ogmios, last block before the first missing block
-const findIntersectForFixup = async (oldestMissingBlockHeight: number) => {
-  logger.trace({oldestMissingBlockHeight}, 'findIntersectForFixup')
+// Can be overridden by continueFromHeight
+const findIntersectForFixup = async (
+  oldestMissingBlockHeight: number,
+  continueFromHeight?: number,
+) => {
+  logger.trace({oldestMissingBlockHeight, continueFromHeight}, 'findIntersectForFixup')
   const dbBlock = await db.query.blocks.findFirst({
-    where: lt(blocks.height, oldestMissingBlockHeight),
+    where: lt(blocks.height, continueFromHeight ?? oldestMissingBlockHeight),
     orderBy: [desc(blocks.slot)],
   })
   return dbBlock ? {id: dbBlock.hash.toString('hex'), slot: dbBlock.slot} : originPoint
@@ -352,7 +356,10 @@ export const startChainSyncClient = async () => {
   if (config.FIXUP_MISSING_BLOCKS.size > 0) {
     originalIntersectSlot = intersect.slot
     const oldestMissingBlockHeight = Math.min(...config.FIXUP_MISSING_BLOCKS)
-    intersect = await findIntersectForFixup(oldestMissingBlockHeight)
+    intersect = await findIntersectForFixup(
+      oldestMissingBlockHeight,
+      config.FIXUP_CONTINUE_FROM_HEIGHT,
+    )
     logger.info({intersectForFixup: intersect, originalIntersectSlot}, 'Fixup - found intersects')
   }
   logger.info({intersect}, 'Ogmios - resuming chainSyncClient')
