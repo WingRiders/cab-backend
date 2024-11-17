@@ -35,6 +35,11 @@ jobs:
           git remote add public git@github.com:WingRiders/cab-backend.git
           git fetch public main
 
+      - name: Checkout public repo branch
+        shell: bash
+        run: |
+          git checkout public/main
+
       - name: Push tag to public repo
         shell: bash
         env:
