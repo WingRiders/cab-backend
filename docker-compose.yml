@@ -2,7 +2,7 @@ version: "3.5"
 
 services:
   cardano-node:
-    image: ghcr.io/intersectmbo/cardano-node:8.9.2
+    image: ghcr.io/intersectmbo/cardano-node:10.1.2
     restart: unless-stopped
     command: [
       "run",
@@ -23,7 +23,7 @@ services:
         max-file: "20"
 
   ogmios:
-    image: cardanosolutions/ogmios:6.2.0
+    image: cardanosolutions/ogmios:6.9.0
     restart: unless-stopped
     command: [
       "--host", "0.0.0.0",
@@ -35,7 +35,7 @@ services:
       - node-ipc:/ipc
     ports:
       - ${OGMIOS_PORT:-1337}:1337
-  
+
   postgresql:
     image: postgres:16.2-alpine
     restart: unless-stopped
@@ -47,7 +47,7 @@ services:
       - postgres:/var/lib/postgresql/data
     ports:
       - ${POSTGRES_PORT:-5432}:5432
-  
+
   cab-backend:
     image: wingriders/cab-backend:latest
     restart: on-failure
