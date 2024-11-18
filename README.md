@@ -3,23 +3,27 @@
 # CAB Backend
 [![Docker Pulls](https://img.shields.io/docker/pulls/wingriders/cab-backend?style=for-the-badge&logo=docker&logoColor=ffffff&color=05bf75)](https://hub.docker.com/r/wingriders/cab-backend)
 
-Custom backend for CAB, written in TypeScript using PostgreSQL for data storage. Core highlights
+Custom backend for CAB, written in TypeScript using PostgreSQL for data storage. Core highlights:
 
-- ⚖️ Light-weight, syncs the bare minimum - block slots and hashes, tx hashes of submitted transactions, and used addresses
-- ♻️ For other data uses [Ogmios Ledger State Queries](https://ogmios.dev/mini-protocols/local-state-query/), such as UTxOs, protocol params, or current reward account summaries
-- 🚀 Fast to sync data, preprod can be synced from Genesis in under 15 minutes on a laptop
-
+- ⚖️ Lightweight and efficient: Syncs essential data, including block slots and hashes, tx hashes of submitted transactions, used addresses, and unspent transaction outputs (UTxOs).
+- ♻️ Leverages Ogmios for additional data: Uses [Ogmios Ledger State Queries](https://ogmios.dev/mini-protocols/local-state-query/), for protocol parameters, reward account summaries, and other required information.
+- 🛠️ Optimized UTxO management: Indexes all transaction outputs while periodically pruning spent transaction outputs to maintain performance and minimize storage requirements.
 
 ## Why another indexer / backend service?
-We evaluated other alternatives out there and from those none just fit our needs. We use CAB with our backend mainly for agents (off-chain component to smart contracts) and enabling users to connect directly with Ledger / Trezor to our dApp. With that in mind:
-- [cardano-db-sync](https://github.com/IntersectMBO/cardano-db-sync) is a monolith and great when you need all the data from the blockchain in a DB, however it takes up a lot of space and resources and is not the cheapest to run.
-- [kupo](https://github.com/CardanoSolutions/kupo) is nice, but lacked some features around address discovery that we wanted
-- other indexers we evaluated were also either too feature-full for our needs or too minimal
+We evaluated several alternatives but found none that fit our specific needs for integrating CAB with our backend.
+Our focus is on supporting off-chain agents for smart contracts and enabling users to connect directly to our dApp using hardware wallets like Ledger and Trezor.
+Here’s how other solutions compared:
 
-We came to the conclusion that we actually don't need an indexer of all UTxOs as we can just use the State Query from Ogmios. Yes, we acknowledge that querying UTxOs from Ogmios can be slower than for example querying them from an indexer like Kupo. However, the difference is not terrible and with the non-frequent usage of the backend it actually makes sense to cut down on storage costs in favor of slighlty slower UTxO queries.
+- [cardano-db-sync](https://github.com/IntersectMBO/cardano-db-sync): A comprehensive solution for storing all blockchain data in a database. While powerful, it is resource-heavy, consumes significant storage, and is costly to operate, making it overkill for our use case.
+- [kupo](https://github.com/CardanoSolutions/kupo): A lightweight indexer with great performance but lacking features for address discovery, which we needed.
 
-So the resulting backend is a bundle of a simple indexer, that aggregates used addresses, tx hashes of submitted transactions, and a wrapper around some required Ogmios queries. This results in a relatively low-profile, easy to maintain, and fast backend.
+To address these gaps, we built a custom backend tailored to our needs. It combines a simple UTxO indexer with periodic pruning of spent transaction outputs. Key features include:
 
+**Address discovery and transaction tracking:** The indexer aggregates used addresses and tx hashes of submitted transactions.
+
+**Ogmios integration:** For cases where direct state queries suffice, our backend wraps essential Ogmios queries.
+
+**Lightweight and efficient:** By keeping only unspent transaction outputs and periodically removing spent ones, we avoid the storage and resource bloat of full indexers while maintaining high performance.
 
 ## Deployment
 We provide Docker images for CAB Backend. There are individual tags for releases and the `latest` tag on Docker Hub mirrors the state of the `main` branch.
@@ -299,14 +303,25 @@ class address {
 class block {
    bytea hash
    integer slot
+   integer height
 }
 class transaction {
    integer slot
    bytea tx_hash
 }
 
+class transaction_output {
+    varchar utxo_id
+    jsonb ogmios_utxo
+    integer slot
+    integer spend_slot
+    varchar address
+}
+
 address  -->  block : first_slot - slot
 transaction  -->  block : slot
+transaction_output --> block : slot
+transaction_output --> block : spend_slot - slot
 ```
 <details>
 <summary>See complete definition</summary>
@@ -371,14 +386,6 @@ bun lint
 bun fix
 ```
 
-<p align="center">
-<a href="https://www.wingriders.com/">WingRiders</a> ·
-<a href="https://community.wingriders.com/">Community Portal</a> ·
-<a href="https://twitter.com/wingriderscom">Twitter</a> ·
-<a href="https://discord.gg/t7CdyhK8JA">Discord</a> ·
-<a href="https://medium.com/@wingriderscom">Medium</a>
-</p>
-
 ### Fixup process
 
 In case some blocks are missing, there is a fixup process to fill missing blocks.
@@ -398,3 +405,11 @@ ORDER BY all_heights.height;
 Then, set the env var `FIXUP_MISSING_BLOCKS=` with comma-separated heights of the missing blocks and restart cab-backend.
 
 When there are no more gaps, restart cab-backend with unset `FIXUP_MISSING_BLOCKS`.
+
+<p align="center">
+<a href="https://www.wingriders.com/">WingRiders</a> ·
+<a href="https://community.wingriders.com/">Community Portal</a> ·
+<a href="https://twitter.com/wingriderscom">Twitter</a> ·
+<a href="https://discord.gg/t7CdyhK8JA">Discord</a> ·
+<a href="https://medium.com/@wingriderscom">Medium</a>
+</p>
