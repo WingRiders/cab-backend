@@ -133,9 +133,21 @@ export const app = new Elysia()
   })
 
   // Submit a TX - non-blocking - don't wait for TX delivery
-  .post('/submitTx', ({body: {transactionCbor}}) => submitTx(transactionCbor), {
-    body: t.Object({transactionCbor: t.String()}),
-  })
+  .post(
+    '/submitTx',
+    ({body: {transactionCbor}, set}) =>
+      submitTx(transactionCbor).catch((e) => {
+        set.status = e.code && e.code >= 3000 && e.code < 4000 ? 400 : 500
+        return {
+          message: e.message || 'Unknown error occurred',
+          data: e.data,
+          code: e.code,
+        }
+      }),
+    {
+      body: t.Object({transactionCbor: t.String()}),
+    },
+  )
 
   .post('/filterUsedAddresses', ({body: {addresses}}) => filterUsedAddresses(addresses), {
     body: t.Object({addresses: t.Array(t.String())}),
