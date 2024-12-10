@@ -15,4 +15,5 @@ export const dbConnectionOptions = {
   types: {
     bigint: postgres.BigInt,
   },
+  ssl: 'require' as const,
 }
