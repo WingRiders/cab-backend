@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import postgres from 'postgres'
 import {config} from '../config'
 
@@ -15,5 +16,11 @@ export const dbConnectionOptions = {
   types: {
     bigint: postgres.BigInt,
   },
-  ssl: 'require' as const,
+  ssl:
+    config.DB_SSL_MODE === 'require'
+      ? {
+          rejectUnauthorized: config.DB_SSL_ACCEPT === 'strict',
+          ca: config.DB_SSL_CERT ? fs.readFileSync(config.DB_SSL_CERT).toString() : undefined,
+        }
+      : undefined,
 }

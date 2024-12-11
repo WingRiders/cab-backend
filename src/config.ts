@@ -27,6 +27,9 @@ const Env = Type.Object({
   DB_PASSWORD: Type.String(),
   DB_NAME: Type.String(),
   DB_SCHEMA: Type.String({default: 'cab_backend'}),
+  DB_SSL_MODE: Type.String({default: 'prefer'}),
+  DB_SSL_ACCEPT: Type.String({default: 'strict'}),
+  DB_SSL_CERT: Type.Optional(Type.String()), // Path to .pem file, same as in Dockerfile
   FIXUP_MISSING_BLOCKS: Type.Optional(Type.String()), // Comma-separated numbers
   FIXUP_CONTINUE_FROM_HEIGHT: Type.Optional(Type.Number()),
 })

@@ -35,11 +35,18 @@ export const baseApp = new Elysia()
   .get('/healthcheck', async ({set}) => {
     // Check sync status
     const tipToSlot = (tip: Point | 'origin') => (tip === 'origin' ? originPoint.slot : tip.slot)
-    const [networkSlot, ledgerSlot, lastBlockSlot] = await Promise.all([
-      getNetworkTip().then(tipToSlot),
-      getLedgerTip().then(tipToSlot),
-      getLastBlock().then((block) => (block ? block.slot : 0)),
-    ])
+    const lastBlockPromise = getLastBlock()
+    const networkTipPromise = getNetworkTip()
+    const [networkSlot, ledgerSlot, lastBlockSlot, isDbConnected, isOgmiosConnected] =
+      await Promise.all([
+        networkTipPromise.then(tipToSlot).catch(() => 0),
+        getLedgerTip()
+          .then(tipToSlot)
+          .catch(() => 0),
+        lastBlockPromise.then((block) => (block ? block.slot : 0)).catch(() => 0),
+        lastBlockPromise.then(() => true).catch(() => false),
+        networkTipPromise.then(() => true).catch(() => false),
+      ])
     const healthyThresholdSlot = 300 // 5 minutes
     const healthy =
       networkSlot - ledgerSlot < healthyThresholdSlot &&
@@ -54,6 +61,8 @@ export const baseApp = new Elysia()
       networkSlot,
       ledgerSlot,
       lastBlockSlot,
+      isDbConnected,
+      isOgmiosConnected,
       version: process.env.npm_package_version,
       uptime: process.uptime(),
     }
