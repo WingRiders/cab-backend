@@ -19,7 +19,7 @@ import {logger} from '../logger'
 import {getContext} from './ogmios'
 
 // Buffering is suitable when doing the initial sync
-const BUFFER_SIZE = 10_000
+const BUFFER_SIZE = 1_000
 const IMMUTABLE_BLOCKS_AGE_IN_SLOTS = 172_800 // 2 days
 
 const isShelleyAddress = (address: string) => address.startsWith('addr')
