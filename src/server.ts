@@ -3,6 +3,7 @@ import cors from '@elysiajs/cors'
 import {Elysia, mapResponse, t} from 'elysia'
 import JSONbig from 'json-bigint'
 import {
+  addressesByScriptHashes,
   addressesByStakeKeyHash,
   filterUsedAddresses,
   getLastBlock,
@@ -10,7 +11,7 @@ import {
   utxosByAddresses,
   utxosByReferences,
 } from './db/db'
-import {originPoint} from './helpers.ts'
+import {hexAddressToBech, originPoint} from './helpers.ts'
 import {
   getLedgerTip,
   getNetworkTip,
@@ -95,23 +96,29 @@ export const app = new Elysia()
   // Get UTxOs for given shelley bech32 addresses or references
   .get(
     '/utxos',
-    ({query: {addresses, references}}) => {
-      if (addresses && references)
-        throw new Error('Only one of addresses or references can be provided')
+    async ({query: {addresses, references, scriptHashes}}) => {
+      if ([addresses, references, scriptHashes].filter(Boolean).length > 1)
+        throw new Error('Only one of addresses, references, or scriptHashes can be provided')
 
       if (addresses) return utxosByAddresses(addresses)
       if (references) return utxosByReferences(references)
+      if (scriptHashes) {
+        const addresses = await addressesByScriptHashes(scriptHashes)
+        return utxosByAddresses(addresses.map(({address}) => hexAddressToBech(address)))
+      }
 
-      throw new Error('Either addresses or references must be provided')
+      throw new Error('Either addresses, references, or scriptHashes must be provided')
     },
     {
       query: t.Object({
         addresses: t.Optional(t.Array(t.String())),
         references: t.Optional(t.Array(t.String())),
+        scriptHashes: t.Optional(t.Array(t.String())),
       }),
       transform: ({query}) => {
         query.addresses = (query.addresses as unknown as string | undefined)?.split(',')
         query.references = (query.references as unknown as string | undefined)?.split(',')
+        query.scriptHashes = (query.scriptHashes as unknown as string | undefined)?.split(',')
       },
     },
   )

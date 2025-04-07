@@ -24,6 +24,14 @@ export const addressesByStakeKeyHash = (stakeKeyHash: string) =>
     where: dsql`substr(${schema.addresses},30,28)=${Buffer.from(stakeKeyHash, 'hex')}`,
   })
 
+export const addressesByScriptHashes = (scriptHashes: string[]) =>
+  db.query.addresses.findMany({
+    where: dsql`substr(${schema.addresses}, 2, 28) in (${dsql.join(
+      scriptHashes.map((scriptHash) => dsql`${Buffer.from(scriptHash, 'hex')}`),
+      dsql`, `,
+    )})`,
+  })
+
 export const filterUsedAddresses = (addresses: string[]) =>
   db.query.addresses.findMany({
     where: inArray(schema.addresses.address, addresses.map(bechAddressToHex)),

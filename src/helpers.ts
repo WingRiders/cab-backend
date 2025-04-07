@@ -1,8 +1,15 @@
 import {bech32} from 'bech32'
 import {config} from './config'
 
+const addressBufferLengthLimit = 114
+
 export const bechAddressToHex = (address: string) =>
-  Buffer.from(bech32.fromWords(bech32.decode(address, 114).words))
+  Buffer.from(bech32.fromWords(bech32.decode(address, addressBufferLengthLimit).words))
+
+const bechPrefix = `addr${config.NETWORK === 'preprod' ? '_test' : ''}`
+
+export const hexAddressToBech = (address: Buffer) =>
+  bech32.encode(bechPrefix, bech32.toWords(address), addressBufferLengthLimit)
 
 // Shelley initial block
 export const originPoint = {
