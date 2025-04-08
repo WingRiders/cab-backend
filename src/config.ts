@@ -19,6 +19,7 @@ const Env = Type.Object({
   LOG_LEVEL: StringEnum(['silent', 'trace', 'debug', 'info', 'warn', 'error', 'fatal'], {
     default: 'info',
   }),
+  NODE_ENV: StringEnum(['development', 'production', 'test'], {default: 'development'}),
   OGMIOS_HOST: Type.String({default: 'localhost'}),
   OGMIOS_PORT: Type.Number({default: 1337}),
   DB_HOST: Type.String({default: 'localhost'}),
