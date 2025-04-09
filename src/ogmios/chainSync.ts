@@ -55,12 +55,14 @@ const processBlock = async (block: BlockPraos) => {
       addressBuffer.push(newAddress)
 
       const utxoId = `${tx.id}#${outputIndex}`
+      const datum =
+        output.datum ?? (output.datumHash != null ? tx.datums?.[output.datumHash] : undefined)
       const newTxOutput: NewTxOutput = {
         utxoId,
         slot: block.slot,
         spendSlot: null,
         address: output.address,
-        ogmiosUtxo: stringify({transaction: {id: tx.id}, index: outputIndex, ...output}),
+        ogmiosUtxo: stringify({transaction: {id: tx.id}, index: outputIndex, ...output, datum}),
       }
       txOutputBuffer.push(newTxOutput)
       if (config.FIXUP_MISSING_BLOCKS.size > 0) {
