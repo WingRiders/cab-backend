@@ -14,7 +14,7 @@
     "start": "NODE_ENV=production bun src/index.ts"
   },
   "dependencies": {
-    "@cardano-ogmios/client": "^6.10.0",
+    "@cardano-ogmios/client": "^6.11.2",
     "@elysiajs/cors": "^1.1.1",
     "@sinclair/typebox": "^0.32.18",
     "bech32": "^2.0.0",
@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "1.6.2",
-    "@cardano-ogmios/schema": "^6.10.0",
+    "@cardano-ogmios/schema": "^6.11.2",
     "@elysiajs/eden": "^1.0.5",
     "@types/bun": "latest",
     "drizzle-kit": "^0.20.14",
