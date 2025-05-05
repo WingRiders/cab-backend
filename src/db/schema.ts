@@ -68,11 +68,13 @@ export const transactionOutputs = pgTable(
     slot: integer('slot').notNull(),
     spendSlot: integer('spend_slot'),
     address: varchar('address').notNull(),
+    paymentCredential: bytea('payment_credential').notNull(),
   },
   (table) => ({
     addressIdx: index('address_idx').on(table.address),
     slotIdx: index('transaction_output_slot_idx').on(table.slot),
     spendSlotIdx: index('spend_slot_idx').on(table.spendSlot),
+    paymentCredentialIdx: index('txo_payment_credential_idx').on(table.paymentCredential),
   }),
 )
 

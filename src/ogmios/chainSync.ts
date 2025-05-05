@@ -14,7 +14,7 @@ import {
   transactionOutputs,
   transactions,
 } from '../db/schema'
-import {bechAddressToHex, originPoint} from '../helpers.ts'
+import {bechAddressToHex, originPoint, paymentCredentialFromAddress} from '../helpers.ts'
 import {logger} from '../logger'
 import {getContext} from './ogmios'
 
@@ -62,6 +62,7 @@ const processBlock = async (block: BlockPraos) => {
         slot: block.slot,
         spendSlot: null,
         address: output.address,
+        paymentCredential: paymentCredentialFromAddress(output.address),
         ogmiosUtxo: stringify({transaction: {id: tx.id}, index: outputIndex, ...output, datum}),
       }
       txOutputBuffer.push(newTxOutput)
@@ -200,14 +201,15 @@ const writeBuffersIfNecessary = async ({
 
         if (txOutputBuffer.length > 0) {
           await sql`
-              INSERT INTO transaction_output (utxo_id, slot, spend_slot, address, ogmios_utxo)
+              INSERT INTO transaction_output (utxo_id, slot, spend_slot, address, ogmios_utxo, payment_credential)
               SELECT *
               FROM unnest(
                       ${sql.array(txOutputBuffer.map(({utxoId}) => utxoId))}::varchar[],
                       ${sql.array(txOutputBuffer.map(({slot}) => slot))}::integer[],
                       ${sql.array(txOutputBuffer.map(({spendSlot}) => spendSlot ?? null))}::integer[],
                       ${sql.array(txOutputBuffer.map(({address}) => address))}::varchar[],
-                      ${sql.array(txOutputBuffer.map(({ogmiosUtxo}) => ogmiosUtxo))}::jsonb[]
+                      ${sql.array(txOutputBuffer.map(({ogmiosUtxo}) => ogmiosUtxo))}::jsonb[],
+                      ${sql.array(txOutputBuffer.map(({paymentCredential}) => paymentCredential))}::bytea[]
                    )
               ON CONFLICT DO NOTHING`
         }

@@ -6,6 +6,9 @@ const addressBufferLengthLimit = 114
 export const bechAddressToHex = (address: string) =>
   Buffer.from(bech32.fromWords(bech32.decode(address, addressBufferLengthLimit).words))
 
+export const paymentCredentialFromAddress = (address: string) =>
+  bechAddressToHex(address).subarray(1, 29)
+
 const bechPrefix = `addr${config.NETWORK === 'preprod' ? '_test' : ''}`
 
 export const hexAddressToBech = (address: Buffer) =>
