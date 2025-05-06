@@ -1,17 +1,18 @@
 import type {Point} from '@cardano-ogmios/schema'
 import cors from '@elysiajs/cors'
+import type {Serve} from 'bun'
 import {Elysia, mapResponse, t} from 'elysia'
 import JSONbig from 'json-bigint'
 import {
-  addressesByScriptHashes,
   addressesByStakeKeyHash,
   filterUsedAddresses,
   getLastBlock,
   transactionByTxHash,
   utxosByAddresses,
   utxosByReferences,
+  utxosByScriptHashes,
 } from './db/db'
-import {hexAddressToBech, originPoint} from './helpers.ts'
+import {originPoint} from './helpers.ts'
 import {
   getLedgerTip,
   getNetworkTip,
@@ -69,7 +70,12 @@ export const baseApp = new Elysia()
     }
   })
 
-export const app = new Elysia()
+export const app = new Elysia({
+  serve: {
+    idleTimeout: 60, // Set request timeout to 1 minute
+  } as Serve & {idleTimeout: number}, // Bun.serve does not officially expose idleTimeout option
+})
+
   // Reuse baseApp for /healthstatus
   .use(baseApp)
 
@@ -93,7 +99,10 @@ export const app = new Elysia()
   // Get ledger tip
   .get('/ledgerTip', () => getLedgerTip())
 
-  // Get UTxOs for given shelley bech32 addresses or references
+  /**
+   * @deprecated Use POST /utxos instead
+   * @description Get UTxOs for given shelley bech32 addresses, references or script hashes
+   */
   .get(
     '/utxos',
     async ({query: {addresses, references, scriptHashes}}) => {
@@ -102,10 +111,7 @@ export const app = new Elysia()
 
       if (addresses) return utxosByAddresses(addresses)
       if (references) return utxosByReferences(references)
-      if (scriptHashes) {
-        const addresses = await addressesByScriptHashes(scriptHashes)
-        return utxosByAddresses(addresses.map(({address}) => hexAddressToBech(address)))
-      }
+      if (scriptHashes) return utxosByScriptHashes(scriptHashes)
 
       throw new Error('Either addresses, references, or scriptHashes must be provided')
     },
@@ -120,6 +126,49 @@ export const app = new Elysia()
         query.references = (query.references as unknown as string | undefined)?.split(',')
         query.scriptHashes = (query.scriptHashes as unknown as string | undefined)?.split(',')
       },
+    },
+  )
+
+  // Get UTxOs for given shelley bech32 addresses, references or script hashes
+  .post(
+    '/utxos',
+    async ({body: {source, pagination, filterOptions}}) => {
+      const utxoQueryOptions = {
+        limit: pagination?.limit,
+        lastSeenUtxoId: pagination?.lastSeenUtxoId,
+        hasOneOfTokens: filterOptions?.hasOneOfTokens,
+        mustHaveDatum: filterOptions?.mustHaveDatum,
+      }
+      if ('addresses' in source) return utxosByAddresses(source.addresses, utxoQueryOptions)
+      if ('references' in source) return utxosByReferences(source.references, utxoQueryOptions)
+      if ('scriptHashes' in source)
+        return utxosByScriptHashes(source.scriptHashes, utxoQueryOptions)
+    },
+    {
+      body: t.Object({
+        source: t.Union([
+          t.Object({addresses: t.Array(t.String(), {minItems: 1})}, {additionalProperties: false}),
+          t.Object({references: t.Array(t.String(), {minItems: 1})}, {additionalProperties: false}),
+          t.Object(
+            {scriptHashes: t.Array(t.String(), {minItems: 1})},
+            {additionalProperties: false},
+          ),
+        ]),
+        pagination: t.Optional(
+          t.Object({
+            limit: t.Number({minimum: 1}),
+            lastSeenUtxoId: t.Optional(t.String()),
+          }),
+        ),
+        filterOptions: t.Optional(
+          t.Object({
+            hasOneOfTokens: t.Optional(
+              t.Array(t.Object({policyId: t.String(), assetName: t.String()})),
+            ),
+            mustHaveDatum: t.Optional(t.Boolean({default: false})),
+          }),
+        ),
+      }),
     },
   )
 

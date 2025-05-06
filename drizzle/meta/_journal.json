@@ -64,6 +64,13 @@
       "when": 1746177070760,
       "tag": "0008_windy_master_chief",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1746469731057,
+      "tag": "0009_shocking_crusher_hogan",
+      "breakpoints": true
     }
   ]
 }

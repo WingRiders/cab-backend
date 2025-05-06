@@ -1,0 +1,178 @@
+{
+  "id": "53b4622a-1df8-4fdc-8e9a-dad780a5c77c",
+  "prevId": "b08f50df-f651-4e0e-bbce-01bed04d4d12",
+  "version": "5",
+  "dialect": "pg",
+  "tables": {
+    "address": {
+      "name": "address",
+      "schema": "",
+      "columns": {
+        "address": {
+          "name": "address",
+          "type": "bytea",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "first_slot": {
+          "name": "first_slot",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "first_slot_idx": {
+          "name": "first_slot_idx",
+          "columns": [
+            "first_slot"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "block": {
+      "name": "block",
+      "schema": "",
+      "columns": {
+        "slot": {
+          "name": "slot",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "hash": {
+          "name": "hash",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "height": {
+          "name": "height",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "transaction_output": {
+      "name": "transaction_output",
+      "schema": "",
+      "columns": {
+        "utxo_id": {
+          "name": "utxo_id",
+          "type": "varchar",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "ogmios_utxo": {
+          "name": "ogmios_utxo",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slot": {
+          "name": "slot",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "spend_slot": {
+          "name": "spend_slot",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "address": {
+          "name": "address",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payment_credential": {
+          "name": "payment_credential",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "address_idx": {
+          "name": "address_idx",
+          "columns": [
+            "address"
+          ],
+          "isUnique": false
+        },
+        "transaction_output_slot_idx": {
+          "name": "transaction_output_slot_idx",
+          "columns": [
+            "slot"
+          ],
+          "isUnique": false
+        },
+        "spend_slot_idx": {
+          "name": "spend_slot_idx",
+          "columns": [
+            "spend_slot"
+          ],
+          "isUnique": false
+        },
+        "txo_payment_credential_idx": {
+          "name": "txo_payment_credential_idx",
+          "columns": [
+            "payment_credential"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "transaction": {
+      "name": "transaction",
+      "schema": "",
+      "columns": {
+        "tx_hash": {
+          "name": "tx_hash",
+          "type": "bytea",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "slot": {
+          "name": "slot",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "slot_idx": {
+          "name": "slot_idx",
+          "columns": [
+            "slot"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

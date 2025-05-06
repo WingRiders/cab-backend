@@ -1,4 +1,4 @@
-import {and, desc, sql as dsql, eq, inArray, isNull} from 'drizzle-orm'
+import {and, desc, sql as dsql, eq, gt, inArray, isNotNull, isNull, or} from 'drizzle-orm'
 import type {PgColumn} from 'drizzle-orm/pg-core'
 import {drizzle} from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
@@ -24,27 +24,64 @@ export const addressesByStakeKeyHash = (stakeKeyHash: string) =>
     where: dsql`substr(${schema.addresses},30,28)=${Buffer.from(stakeKeyHash, 'hex')}`,
   })
 
-export const addressesByScriptHashes = (scriptHashes: string[]) =>
-  db.query.addresses.findMany({
-    where: dsql`substr(${schema.addresses}, 2, 28) in (${dsql.join(
-      scriptHashes.map((scriptHash) => dsql`${Buffer.from(scriptHash, 'hex')}`),
-      dsql`, `,
-    )})`,
-  })
-
 export const filterUsedAddresses = (addresses: string[]) =>
   db.query.addresses.findMany({
     where: inArray(schema.addresses.address, addresses.map(bechAddressToHex)),
   })
 
-const utxosByColumnValues = async (column: PgColumn, values: string[]) => {
-  const txOutputs = await db.query.transactionOutputs.findMany({
-    where: and(inArray(column, values), isNull(schema.transactionOutputs.spendSlot)),
-  })
-  return txOutputs.map(({ogmiosUtxo}) => ogmiosUtxo)
+type UtxoQueryOptions = {
+  limit?: number
+  lastSeenUtxoId?: string
+  hasOneOfTokens?: {policyId: string; assetName: string}[]
+  mustHaveDatum?: boolean
 }
-export const utxosByAddresses = (addresses: string[]) =>
-  utxosByColumnValues(schema.transactionOutputs.address, addresses)
 
-export const utxosByReferences = (utxoIds: string[]) =>
-  utxosByColumnValues(schema.transactionOutputs.utxoId, utxoIds)
+const utxosByColumnValues = async (
+  column: PgColumn,
+  values: string[] | Buffer[],
+  utxoQueryOptions?: UtxoQueryOptions,
+) => {
+  const tokenConditions =
+    utxoQueryOptions?.hasOneOfTokens?.map(
+      ({policyId, assetName}) =>
+        dsql`jsonb_path_exists(${
+          schema.transactionOutputs.ogmiosUtxo
+        }, ${`$.value."${policyId}"."${assetName}"`})`,
+    ) ?? []
+
+  const query = db
+    .select({ogmiosUtxo: schema.transactionOutputs.ogmiosUtxo})
+    .from(schema.transactionOutputs)
+    .where(
+      and(
+        inArray(column, values),
+        isNull(schema.transactionOutputs.spendSlot),
+        utxoQueryOptions?.lastSeenUtxoId
+          ? gt(schema.transactionOutputs.utxoId, utxoQueryOptions.lastSeenUtxoId)
+          : undefined,
+        utxoQueryOptions?.mustHaveDatum
+          ? isNotNull(dsql`${schema.transactionOutputs.ogmiosUtxo}->'datum'`)
+          : undefined,
+        or(...tokenConditions),
+      ),
+    )
+    .orderBy(schema.transactionOutputs.utxoId)
+  const utxos = await (utxoQueryOptions?.limit
+    ? query.limit(utxoQueryOptions.limit)
+    : query
+  ).execute()
+  return utxos.map(({ogmiosUtxo}) => ogmiosUtxo)
+}
+
+export const utxosByAddresses = (addresses: string[], utxoQueryOptions?: UtxoQueryOptions) =>
+  utxosByColumnValues(schema.transactionOutputs.address, addresses, utxoQueryOptions)
+
+export const utxosByReferences = (utxoIds: string[], utxoQueryOptions?: UtxoQueryOptions) =>
+  utxosByColumnValues(schema.transactionOutputs.utxoId, utxoIds, utxoQueryOptions)
+
+export const utxosByScriptHashes = (scriptHashes: string[], utxoQueryOptions?: UtxoQueryOptions) =>
+  utxosByColumnValues(
+    schema.transactionOutputs.paymentCredential,
+    scriptHashes.map((hash) => Buffer.from(hash, 'hex')),
+    utxoQueryOptions,
+  )

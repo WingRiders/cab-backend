@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "txo_ogmios_utxo_idx" ON "transaction_output" USING GIN ("ogmios_utxo");
