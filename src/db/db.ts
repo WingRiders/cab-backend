@@ -53,6 +53,7 @@ const utxosByColumnValues = async (
   const createBaseQuery = () => {
     const query = db
       .select({
+        slot: schema.transactionOutputs.slot,
         ogmiosUtxo: schema.transactionOutputs.ogmiosUtxo,
         ...(utxoQueryOptions?.includeTxIndex ? {txIndex: schema.transactions.txIndex} : {}),
       })
@@ -90,7 +91,7 @@ const utxosByColumnValues = async (
   }
 
   const utxos = await runQuery(createBaseQuery())
-  return utxos.map(({ogmiosUtxo, txIndex}) => ({...(ogmiosUtxo as object), txIndex}))
+  return utxos.map(({slot, ogmiosUtxo, txIndex}) => ({slot, ...(ogmiosUtxo as object), txIndex}))
 }
 
 export const utxosByAddresses = (addresses: string[], utxoQueryOptions?: UtxoQueryOptions) =>
