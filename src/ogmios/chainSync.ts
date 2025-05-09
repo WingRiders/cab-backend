@@ -267,6 +267,8 @@ const findIntersectForFixup = async (
   return dbBlock ? {id: dbBlock.hash.toString('hex'), slot: dbBlock.slot} : originPoint
 }
 
+let hasCloseEventListener = false
+
 // Start the chain sync client, and add a listener on the underlying socket - connection to Ogmios
 // If that closes try to restart the chain sync again
 export const startChainSyncClient = async () => {
@@ -369,6 +371,9 @@ export const startChainSyncClient = async () => {
   logger.info({intersect}, 'Ogmios - resuming chainSyncClient')
   await chainSyncClient.resume([intersect], 100)
 
-  // Restart chainSyncClient on context close
-  context.socket.addEventListener('close', () => startChainSyncClient())
+  if (!hasCloseEventListener) {
+    // Restart chainSyncClient on context close
+    context.socket.addEventListener('close', () => startChainSyncClient())
+    hasCloseEventListener = true
+  }
 }
