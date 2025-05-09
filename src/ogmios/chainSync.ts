@@ -38,8 +38,8 @@ const processBlock = async (block: BlockPraos) => {
   blockBuffer.push({slot: block.slot, hash: Buffer.from(block.id, 'hex'), height: block.height})
 
   const transactions: Transaction[] = block.transactions ?? []
-  transactions.map((tx) => {
-    const newTx: NewTx = {txHash: Buffer.from(tx.id, 'hex'), slot: block.slot}
+  transactions.map((tx, txIndex) => {
+    const newTx: NewTx = {txHash: Buffer.from(tx.id, 'hex'), slot: block.slot, txIndex}
     txBuffer.push(newTx)
 
     let outputIndex = 0
@@ -181,11 +181,12 @@ const writeBuffersIfNecessary = async ({
 
       if (txBuffer.length > 0) {
         await sql`
-            INSERT INTO transaction (tx_hash, slot)
+            INSERT INTO transaction (tx_hash, slot, tx_index)
             SELECT *
             FROM unnest(
                     ${sql.array(txBuffer.map(({txHash}) => txHash))}::bytea[],
-                    ${sql.array(txBuffer.map(({slot}) => slot))}::integer[])
+                    ${sql.array(txBuffer.map(({slot}) => slot))}::integer[],
+                    ${sql.array(txBuffer.map(({txIndex}) => txIndex))}::integer[])
             ON CONFLICT DO NOTHING`
 
         // Addresses might repeat, so `ON CONFLICT DO NOTHING` skips any duplicates and keeps

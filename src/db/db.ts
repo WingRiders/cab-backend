@@ -34,6 +34,7 @@ type UtxoQueryOptions = {
   lastSeenUtxoId?: string
   hasOneOfTokens?: {policyId: string; assetName: string}[]
   mustHaveDatum?: boolean
+  includeTxIndex?: boolean
 }
 
 const utxosByColumnValues = async (
@@ -49,28 +50,47 @@ const utxosByColumnValues = async (
         }, ${`$.value."${policyId}"."${assetName}"`})`,
     ) ?? []
 
-  const query = db
-    .select({ogmiosUtxo: schema.transactionOutputs.ogmiosUtxo})
-    .from(schema.transactionOutputs)
-    .where(
-      and(
-        inArray(column, values),
-        isNull(schema.transactionOutputs.spendSlot),
-        utxoQueryOptions?.lastSeenUtxoId
-          ? gt(schema.transactionOutputs.utxoId, utxoQueryOptions.lastSeenUtxoId)
-          : undefined,
-        utxoQueryOptions?.mustHaveDatum
-          ? isNotNull(dsql`${schema.transactionOutputs.ogmiosUtxo}->'datum'`)
-          : undefined,
-        or(...tokenConditions),
-      ),
-    )
-    .orderBy(schema.transactionOutputs.utxoId)
-  const utxos = await (utxoQueryOptions?.limit
-    ? query.limit(utxoQueryOptions.limit)
-    : query
-  ).execute()
-  return utxos.map(({ogmiosUtxo}) => ogmiosUtxo)
+  const createBaseQuery = () => {
+    const query = db
+      .select({
+        ogmiosUtxo: schema.transactionOutputs.ogmiosUtxo,
+        ...(utxoQueryOptions?.includeTxIndex ? {txIndex: schema.transactions.txIndex} : {}),
+      })
+      .from(schema.transactionOutputs)
+
+    return utxoQueryOptions?.includeTxIndex
+      ? query.innerJoin(
+          schema.transactions,
+          eq(
+            dsql`encode(${schema.transactions.txHash}, 'hex')`,
+            dsql`left(${schema.transactionOutputs.utxoId}::text, 64)`,
+          ),
+        )
+      : query
+  }
+
+  const runQuery = (baseQuery: ReturnType<typeof createBaseQuery>) => {
+    const query = baseQuery
+      .where(
+        and(
+          inArray(column, values),
+          isNull(schema.transactionOutputs.spendSlot),
+          utxoQueryOptions?.lastSeenUtxoId
+            ? gt(schema.transactionOutputs.utxoId, utxoQueryOptions.lastSeenUtxoId)
+            : undefined,
+          utxoQueryOptions?.mustHaveDatum
+            ? isNotNull(dsql`${schema.transactionOutputs.ogmiosUtxo}->'datum'`)
+            : undefined,
+          or(...tokenConditions),
+        ),
+      )
+      .orderBy(schema.transactionOutputs.utxoId)
+
+    return (utxoQueryOptions?.limit ? query.limit(utxoQueryOptions.limit) : query).execute()
+  }
+
+  const utxos = await runQuery(createBaseQuery())
+  return utxos.map(({ogmiosUtxo, txIndex}) => ({...(ogmiosUtxo as object), txIndex}))
 }
 
 export const utxosByAddresses = (addresses: string[], utxoQueryOptions?: UtxoQueryOptions) =>

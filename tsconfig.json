@@ -16,7 +16,8 @@
     "strict": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "noErrorTruncation": true
   },
   "include": ["src/**/*", "test/**/*"],
   "exclude": ["node_modules"]

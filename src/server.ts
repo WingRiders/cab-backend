@@ -132,12 +132,13 @@ export const app = new Elysia({
   // Get UTxOs for given shelley bech32 addresses, references or script hashes
   .post(
     '/utxos',
-    async ({body: {source, pagination, filterOptions}}) => {
+    async ({body: {source, pagination, filterOptions, includeTxIndex}}) => {
       const utxoQueryOptions = {
         limit: pagination?.limit,
         lastSeenUtxoId: pagination?.lastSeenUtxoId,
         hasOneOfTokens: filterOptions?.hasOneOfTokens,
         mustHaveDatum: filterOptions?.mustHaveDatum,
+        includeTxIndex,
       }
       if ('addresses' in source) return utxosByAddresses(source.addresses, utxoQueryOptions)
       if ('references' in source) return utxosByReferences(source.references, utxoQueryOptions)
@@ -168,6 +169,7 @@ export const app = new Elysia({
             mustHaveDatum: t.Optional(t.Boolean({default: false})),
           }),
         ),
+        includeTxIndex: t.Optional(t.Boolean({default: false})),
       }),
     },
   )

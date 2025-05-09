@@ -28,6 +28,7 @@ export const transactions = pgTable(
   {
     txHash: bytea('tx_hash').primaryKey(),
     slot: integer('slot').notNull(),
+    txIndex: integer('tx_index').notNull(), // index of the transaction in the block
   },
   (table) => ({
     slotIdx: index('slot_idx').on(table.slot),
