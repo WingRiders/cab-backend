@@ -62,10 +62,7 @@ const utxosByColumnValues = async (
     return utxoQueryOptions?.includeTxIndex
       ? query.innerJoin(
           schema.transactions,
-          eq(
-            dsql`encode(${schema.transactions.txHash}, 'hex')`,
-            dsql`left(${schema.transactionOutputs.utxoId}::text, 64)`,
-          ),
+          eq(schema.transactions.txHash, schema.transactionOutputs.txHash),
         )
       : query
   }

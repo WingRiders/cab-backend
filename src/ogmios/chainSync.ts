@@ -59,6 +59,7 @@ const processBlock = async (block: BlockPraos) => {
         output.datum ?? (output.datumHash != null ? tx.datums?.[output.datumHash] : undefined)
       const newTxOutput: NewTxOutput = {
         utxoId,
+        txHash: Buffer.from(tx.id, 'hex'),
         slot: block.slot,
         spendSlot: null,
         address: output.address,
@@ -202,10 +203,11 @@ const writeBuffersIfNecessary = async ({
 
         if (txOutputBuffer.length > 0) {
           await sql`
-              INSERT INTO transaction_output (utxo_id, slot, spend_slot, address, ogmios_utxo, payment_credential)
+              INSERT INTO transaction_output (utxo_id, tx_hash, slot, spend_slot, address, ogmios_utxo, payment_credential)
               SELECT *
               FROM unnest(
                       ${sql.array(txOutputBuffer.map(({utxoId}) => utxoId))}::varchar[],
+                      ${sql.array(txOutputBuffer.map(({txHash}) => txHash))}::bytea[],
                       ${sql.array(txOutputBuffer.map(({slot}) => slot))}::integer[],
                       ${sql.array(txOutputBuffer.map(({spendSlot}) => spendSlot ?? null))}::integer[],
                       ${sql.array(txOutputBuffer.map(({address}) => address))}::varchar[],

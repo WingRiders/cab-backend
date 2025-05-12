@@ -65,6 +65,7 @@ export const transactionOutputs = pgTable(
   'transaction_output',
   {
     utxoId: varchar('utxo_id').primaryKey(),
+    txHash: bytea('tx_hash').notNull(),
     ogmiosUtxo: jsonb('ogmios_utxo').notNull(),
     slot: integer('slot').notNull(),
     spendSlot: integer('spend_slot'),
@@ -72,6 +73,7 @@ export const transactionOutputs = pgTable(
     paymentCredential: bytea('payment_credential').notNull(),
   },
   (table) => ({
+    txHashIdx: index('txo_tx_hash_idx').on(table.txHash),
     addressIdx: index('address_idx').on(table.address),
     slotIdx: index('transaction_output_slot_idx').on(table.slot),
     spendSlotIdx: index('spend_slot_idx').on(table.spendSlot),
@@ -83,6 +85,10 @@ export const transactionOutputs = pgTable(
 export const transactionOutputsRelations = relations(transactionOutputs, ({one}) => ({
   block: one(blocks, {fields: [transactionOutputs.slot], references: [blocks.slot]}),
   spendBlock: one(blocks, {fields: [transactionOutputs.spendSlot], references: [blocks.slot]}),
+  transaction: one(transactions, {
+    fields: [transactionOutputs.txHash],
+    references: [transactions.txHash],
+  }),
 }))
 
 // We stringify the JSONB structure before adding to the buffer to prevent null-byte error in the unnest interpolation
