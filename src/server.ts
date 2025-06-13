@@ -176,12 +176,12 @@ export const app = new Elysia({
 
   // Get stake key info - rewards, delegated, stake pool id
   .get('/rewardAccountSummary/:stakeKeyHash', async ({params: {stakeKeyHash}, set}) => {
-    const rewardAccountSummary = (await getRewardAccountSummary(stakeKeyHash))[stakeKeyHash]
-    if (!rewardAccountSummary) {
+    const rewardAccountSummaries = await getRewardAccountSummary(stakeKeyHash)
+    if (!rewardAccountSummaries?.length) {
       set.status = 404
       return {msg: 'Stake key not found, or the stake key is not registered'}
     }
-    return rewardAccountSummary
+    return rewardAccountSummaries[0]
   })
 
   // Gets list of used addresses for given stakeKeyHash
