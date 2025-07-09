@@ -1,10 +1,13 @@
 import {and, desc, sql as dsql, eq, gt, inArray, isNotNull, isNull, or} from 'drizzle-orm'
 import type {PgColumn} from 'drizzle-orm/pg-core'
 import {drizzle} from 'drizzle-orm/postgres-js'
+import JSONbig from 'json-bigint'
 import postgres from 'postgres'
 import {bechAddressToHex} from '../helpers.ts'
 import {dbConnectionOptions} from './config'
 import * as schema from './schema'
+
+const {parse} = JSONbig({storeAsString: true})
 
 // Open a connection
 export const sql = postgres(dbConnectionOptions)
@@ -54,7 +57,7 @@ const utxosByColumnValues = async (
     const query = db
       .select({
         slot: schema.transactionOutputs.slot,
-        ogmiosUtxo: schema.transactionOutputs.ogmiosUtxo,
+        ogmiosUtxo: dsql<string>`ogmios_utxo::text`,
         ...(utxoQueryOptions?.includeTxIndex ? {txIndex: schema.transactions.txIndex} : {}),
       })
       .from(schema.transactionOutputs)
@@ -88,7 +91,11 @@ const utxosByColumnValues = async (
   }
 
   const utxos = await runQuery(createBaseQuery())
-  return utxos.map(({slot, ogmiosUtxo, txIndex}) => ({slot, ...(ogmiosUtxo as object), txIndex}))
+  return utxos.map(({slot, ogmiosUtxo, txIndex}) => ({
+    slot,
+    ...parse(ogmiosUtxo),
+    txIndex,
+  }))
 }
 
 export const utxosByAddresses = (addresses: string[], utxoQueryOptions?: UtxoQueryOptions) =>
