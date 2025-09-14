@@ -42,6 +42,19 @@ const processBlock = async (block: BlockPraos) => {
     const newTx: NewTx = {txHash: Buffer.from(tx.id, 'hex'), slot: block.slot, txIndex}
     txBuffer.push(newTx)
 
+    if (tx.spends === 'collaterals') {
+      // When a transaction spends the collateral inputs (the phase-2 validation failed),
+      // we don't aggregate new outputs and don't mark the inputs as spent.
+      // We only mark the collateral inputs as spent.
+      const spentCollaterals = tx.collaterals?.map((collateral) => ({
+        utxoId: `${collateral.transaction.id}#${collateral.index}`,
+        spendSlot: block.slot,
+      }))
+      spentTxOutputBuffer.push(...(spentCollaterals ?? []))
+
+      return
+    }
+
     let outputIndex = 0
     for (const output of tx.outputs) {
       if (!isShelleyAddress(output.address)) {
