@@ -22,7 +22,7 @@ COPY healthcheck.sh /usr/src/app/healthcheck.sh
 HEALTHCHECK --start-period=10s --interval=30s --retries=10 CMD /usr/src/app/healthcheck.sh
 
 # Add the RDS certificate to the system
-RUN apk add --no-cache ca-certificates=20250619-r0
+RUN apk add --no-cache ca-certificates=20250911-r0
 COPY ca-certificates/rds-global-bundle.pem /usr/local/share/ca-certificates/rds.crt
 RUN update-ca-certificates
 
@@ -30,5 +30,8 @@ RUN update-ca-certificates
 USER bun
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV DB_SSL_MODE=verify-full
+ENV DB_SSL_ACCEPT=strict
+ENV DB_SSL_ROOT_CERT=/etc/ssl/certs/ca-certificates.crt
 EXPOSE 3000/tcp
 CMD [ "./src/index.ts" ]

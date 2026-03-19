@@ -4,7 +4,7 @@ import {config} from '../config'
 
 export const dbSchema = config.DB_SCHEMA
 
-export const dbConnectionOptions = {
+export const dbConnectionOptions: postgres.Options<Record<string, postgres.PostgresType>> = {
   host: config.DB_HOST,
   port: config.DB_PORT,
   user: config.DB_USER,
@@ -17,10 +17,12 @@ export const dbConnectionOptions = {
     bigint: postgres.BigInt,
   },
   ssl:
-    config.DB_SSL_MODE === 'require'
+    config.DB_SSL_MODE === 'verify-full'
       ? {
           rejectUnauthorized: config.DB_SSL_ACCEPT === 'strict',
-          ca: config.DB_SSL_CERT ? fs.readFileSync(config.DB_SSL_CERT).toString() : undefined,
+          ca: config.DB_SSL_ROOT_CERT
+            ? fs.readFileSync(config.DB_SSL_ROOT_CERT).toString()
+            : undefined,
         }
       : undefined,
 }
