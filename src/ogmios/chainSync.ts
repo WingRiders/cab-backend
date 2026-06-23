@@ -56,7 +56,7 @@ const processBlock = async (block: BlockPraos) => {
     }
 
     let outputIndex = 0
-    for (const output of tx.outputs) {
+    for (const output of tx.outputs ?? []) {
       if (!isShelleyAddress(output.address)) {
         // We don't aggregate Byron addresses
         continue
