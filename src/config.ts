@@ -22,6 +22,7 @@ const Env = Type.Object({
   NODE_ENV: StringEnum(['development', 'production', 'test'], {default: 'development'}),
   OGMIOS_HOST: Type.String({default: 'localhost'}),
   OGMIOS_PORT: Type.Number({default: 1337}),
+  OGMIOS_HTTP_URL: Type.Optional(Type.String()),
   DB_HOST: Type.String({default: 'localhost'}),
   DB_PORT: Type.Number({default: 5432}),
   DB_USER: Type.String(),

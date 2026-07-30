@@ -278,6 +278,8 @@ LOG_LEVEL=info
 
 OGMIOS_HOST=localhost
 OGMIOS_PORT=1337
+# Overrides host and port if set
+OGMIOS_HTTP_URL=
 
 # Defines the connection to PostgreSQL, DB_USER, DB_PASSWORD, DB_NAME have no
 # default values and must be set
