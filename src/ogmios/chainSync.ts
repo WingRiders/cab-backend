@@ -136,7 +136,32 @@ let fixupUtxoIds: Set<string> = new Set()
 // Where to stop fixup and start processing full blocks
 let originalIntersectSlot: number | null
 
-// Write buffers into DB
+// Incremented on every (re)start of the chain sync client. On reconnect the superseded
+// client keeps draining the messages it already had queued, so its handlers run in
+// parallel with the new client's. Each client captures the generation it was created with
+// and its handlers stop aggregating as soon as a newer client takes over. Without that
+// they would keep writing blocks after the new client has rolled them back, leaving the
+// DB with a gap below a floating island of stale blocks.
+let clientGeneration = 0
+
+// Mutual exclusion for the buffers above. A handler must hold the lock while it fills the
+// buffers and while it writes them, otherwise a push from a handler of the superseded
+// client can land in between two statements of the SQL transaction below and get written
+// only partially. It also lets a restart wait for a superseded handler that is already
+// inside its critical section when the generation changes.
+let bufferMutex: Promise<void> = Promise.resolve()
+
+const acquireBufferLock = async () => {
+  const previousHolder = bufferMutex
+  let release!: () => void
+  bufferMutex = new Promise((resolve) => {
+    release = resolve
+  })
+  await previousHolder
+  return release
+}
+
+// Write buffers into DB, the caller must hold the buffer lock
 const writeBuffersIfNecessary = async ({
   latestLedgerHeight,
   threshold,
@@ -288,13 +313,19 @@ let hasCloseEventListener = false
 // Start the chain sync client, and add a listener on the underlying socket - connection to Ogmios
 // If that closes try to restart the chain sync again
 export const startChainSyncClient = async () => {
+  // Supersede the previous client, its handlers stop aggregating from here on
+  const generation = ++clientGeneration
+
   // Before starting flush the buffers, required in case of restarts to get rid of stale
-  // data and prevent double writes
+  // data and prevent double writes. Acquiring the lock waits for a handler of the
+  // superseded client that is in the middle of writing them.
+  const releaseBufferLock = await acquireBufferLock()
   blockBuffer = []
   txBuffer = []
   addressBuffer = []
   txOutputBuffer = []
   spentTxOutputBuffer = []
+  releaseBufferLock()
 
   if (config.FIXUP_MISSING_BLOCKS.size > 0) {
     const utxoIdsInFilledBlocks = await db
@@ -317,72 +348,103 @@ export const startChainSyncClient = async () => {
     async rollForward(response, nextBlock) {
       // Skip Byron blocks, we are not interested in those addresses
       if (response.block.era !== 'byron') {
-        logger.trace(
-          {slot: response.block.slot, height: response.block.height, era: response.block.era},
-          'Roll forward',
-        )
+        const releaseBufferLock = await acquireBufferLock()
 
-        await processBlock(response.block)
+        try {
+          if (generation !== clientGeneration) {
+            // A newer client took over, don't aggregate anything and don't ask this
+            // client's closed socket for more blocks
+            return
+          }
 
-        const latestLedgerHeight =
-          response.tip === 'origin' ? originPoint.height : response.tip.height
-
-        // Decide if to use buffering based on proximity to ledger tip
-        // No buffering in fixup mode
-        const threshold =
-          config.FIXUP_MISSING_BLOCKS.size > 0 ||
-          (response.tip !== 'origin' && response.tip.height - 10 < response.block.height)
-            ? 1
-            : BUFFER_SIZE
-        await writeBuffersIfNecessary({latestLedgerHeight, threshold})
-
-        if (config.FIXUP_MISSING_BLOCKS.size > 0) {
-          const spentUtxoIds =
-            response.block.transactions?.flatMap((tx) =>
-              tx.inputs.map((input) => `${input.transaction.id}#${input.index}`),
-            ) ?? []
-          const spentUtxoIdsInFixupBlocks = spentUtxoIds.filter((utxoId) =>
-            fixupUtxoIds.has(utxoId),
+          logger.trace(
+            {slot: response.block.slot, height: response.block.height, era: response.block.era},
+            'Roll forward',
           )
-          if (spentUtxoIdsInFixupBlocks.length > 0) {
-            logger.info(
-              `Fixup - Setting spend_slot=${response.block.slot} for ${spentUtxoIdsInFixupBlocks.length} outputs in missing blocks`,
+
+          await processBlock(response.block)
+
+          const latestLedgerHeight =
+            response.tip === 'origin' ? originPoint.height : response.tip.height
+
+          // Decide if to use buffering based on proximity to ledger tip
+          // No buffering in fixup mode
+          const threshold =
+            config.FIXUP_MISSING_BLOCKS.size > 0 ||
+            (response.tip !== 'origin' && response.tip.height - 10 < response.block.height)
+              ? 1
+              : BUFFER_SIZE
+          await writeBuffersIfNecessary({latestLedgerHeight, threshold})
+
+          if (config.FIXUP_MISSING_BLOCKS.size > 0) {
+            const spentUtxoIds =
+              response.block.transactions?.flatMap((tx) =>
+                tx.inputs.map((input) => `${input.transaction.id}#${input.index}`),
+              ) ?? []
+            const spentUtxoIdsInFixupBlocks = spentUtxoIds.filter((utxoId) =>
+              fixupUtxoIds.has(utxoId),
             )
-            await db
-              .update(transactionOutputs)
-              .set({spendSlot: response.block.slot})
-              .where(inArray(transactionOutputs.utxoId, spentUtxoIdsInFixupBlocks))
-            for (const utxoId of spentUtxoIdsInFixupBlocks) {
-              fixupUtxoIds.delete(utxoId)
+            if (spentUtxoIdsInFixupBlocks.length > 0) {
+              logger.info(
+                `Fixup - Setting spend_slot=${response.block.slot} for ${spentUtxoIdsInFixupBlocks.length} outputs in missing blocks`,
+              )
+              await db
+                .update(transactionOutputs)
+                .set({spendSlot: response.block.slot})
+                .where(inArray(transactionOutputs.utxoId, spentUtxoIdsInFixupBlocks))
+              for (const utxoId of spentUtxoIdsInFixupBlocks) {
+                fixupUtxoIds.delete(utxoId)
+              }
             }
           }
+        } finally {
+          releaseBufferLock()
         }
       }
       nextBlock()
     },
 
     async rollBackward(response, nextBlock) {
-      logger.trace({point: response.point}, 'Roll backward')
-      await writeBuffersIfNecessary({
-        threshold: 1,
-        rollbackToSlot: response.point === 'origin' ? originPoint.slot : response.point.slot,
-      })
-      await processRollback(response.point)
+      const releaseBufferLock = await acquireBufferLock()
+
+      try {
+        if (generation !== clientGeneration) {
+          return
+        }
+
+        logger.trace({point: response.point}, 'Roll backward')
+        await writeBuffersIfNecessary({
+          threshold: 1,
+          rollbackToSlot: response.point === 'origin' ? originPoint.slot : response.point.slot,
+        })
+        await processRollback(response.point)
+      } finally {
+        releaseBufferLock()
+      }
+
       nextBlock()
     },
   })
 
   // Rollback to latest intersect first
   let intersect = await findIntersect()
-  await processRollback(intersect)
-  if (config.FIXUP_MISSING_BLOCKS.size > 0) {
-    originalIntersectSlot = intersect.slot
-    const oldestMissingBlockHeight = Math.min(...config.FIXUP_MISSING_BLOCKS)
-    intersect = await findIntersectForFixup(
-      oldestMissingBlockHeight,
-      config.FIXUP_CONTINUE_FROM_HEIGHT,
-    )
-    logger.info({intersectForFixup: intersect, originalIntersectSlot}, 'Fixup - found intersects')
+  // Hold the lock so that the rollback doesn't run in parallel with a write from a handler
+  // of the superseded client, which would resurrect the rolled back blocks
+  const releaseBufferLockForRollback = await acquireBufferLock()
+
+  try {
+    await processRollback(intersect)
+    if (config.FIXUP_MISSING_BLOCKS.size > 0) {
+      originalIntersectSlot = intersect.slot
+      const oldestMissingBlockHeight = Math.min(...config.FIXUP_MISSING_BLOCKS)
+      intersect = await findIntersectForFixup(
+        oldestMissingBlockHeight,
+        config.FIXUP_CONTINUE_FROM_HEIGHT,
+      )
+      logger.info({intersectForFixup: intersect, originalIntersectSlot}, 'Fixup - found intersects')
+    }
+  } finally {
+    releaseBufferLockForRollback()
   }
   logger.info({intersect}, 'Ogmios - resuming chainSyncClient')
   await chainSyncClient.resume([intersect], 100)
