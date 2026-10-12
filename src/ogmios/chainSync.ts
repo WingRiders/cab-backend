@@ -1,4 +1,4 @@
-import {createChainSynchronizationClient} from '@cardano-ogmios/client'
+import {type InteractionContext, createChainSynchronizationClient} from '@cardano-ogmios/client'
 import type {BlockPraos, Point, Transaction} from '@cardano-ogmios/schema'
 import {and, desc, eq, gt, inArray, isNull, lt, lte} from 'drizzle-orm'
 import {stringify} from 'json-bigint'
@@ -16,7 +16,7 @@ import {
 } from '../db/schema'
 import {bechAddressToHex, originPoint, paymentCredentialFromAddress} from '../helpers.ts'
 import {logger} from '../logger'
-import {getContext} from './ogmios'
+import type {OgmiosClient} from './ogmios'
 
 // Buffering is suitable when doing the initial sync
 const BUFFER_SIZE = 1_000
@@ -136,19 +136,19 @@ let fixupUtxoIds: Set<string> = new Set()
 // Where to stop fixup and start processing full blocks
 let originalIntersectSlot: number | null
 
-// Incremented on every (re)start of the chain sync client. On reconnect the superseded
-// client keeps draining the messages it already had queued, so its handlers run in
-// parallel with the new client's. Each client captures the generation it was created with
-// and its handlers stop aggregating as soon as a newer client takes over. Without that
-// they would keep writing blocks after the new client has rolled them back, leaving the
-// DB with a gap below a floating island of stale blocks.
-let clientGeneration = 0
+// Incremented on every close of the Ogmios connection. The client of a closed connection
+// keeps draining the messages it already had queued, so its handlers can run in parallel
+// with the handlers of the next connection. Each client captures the generation of its
+// connection and its handlers stop aggregating as soon as the connection closes. Without
+// that they would keep writing blocks after the next connection has rolled them back,
+// leaving the DB with a gap below a floating island of stale blocks.
+let connectionGeneration = 0
 
 // Mutual exclusion for the buffers above. A handler must hold the lock while it fills the
-// buffers and while it writes them, otherwise a push from a handler of the superseded
-// client can land in between two statements of the SQL transaction below and get written
-// only partially. It also lets a restart wait for a superseded handler that is already
-// inside its critical section when the generation changes.
+// buffers and while it writes them, otherwise a push from a handler of a closed connection
+// can land in between two statements of the SQL transaction below and get written only
+// partially. It also lets the next connection wait for the handler that was running at
+// the moment of the close, so that the resume point includes its DB writes.
 let bufferMutex: Promise<void> = Promise.resolve()
 
 const acquireBufferLock = async () => {
@@ -308,17 +308,12 @@ const findIntersectForFixup = async (
   return dbBlock ? {id: dbBlock.hash.toString('hex'), slot: dbBlock.slot} : originPoint
 }
 
-let hasCloseEventListener = false
+const initializeChainSyncClient = async (context: InteractionContext) => {
+  const generation = connectionGeneration
 
-// Start the chain sync client, and add a listener on the underlying socket - connection to Ogmios
-// If that closes try to restart the chain sync again
-export const startChainSyncClient = async () => {
-  // Supersede the previous client, its handlers stop aggregating from here on
-  const generation = ++clientGeneration
-
-  // Before starting flush the buffers, required in case of restarts to get rid of stale
-  // data and prevent double writes. Acquiring the lock waits for a handler of the
-  // superseded client that is in the middle of writing them.
+  // Flush the buffers to get rid of stale data and prevent double writes, the blocks in them
+  // come again after the resume. Acquiring the lock waits for the handler of the closed
+  // connection that is in the middle of writing them.
   const releaseBufferLock = await acquireBufferLock()
   blockBuffer = []
   txBuffer = []
@@ -342,18 +337,18 @@ export const startChainSyncClient = async () => {
     fixupUtxoIds = new Set(utxoIdsInFilledBlocks.map(({utxoId}) => utxoId))
   }
 
-  const context = await getContext()
-
   const chainSyncClient = await createChainSynchronizationClient(context, {
     async rollForward(response, nextBlock) {
+      if (generation !== connectionGeneration) {
+        // The connection closed, don't aggregate anything and don't ask its socket for more blocks
+        return
+      }
       // Skip Byron blocks, we are not interested in those addresses
       if (response.block.era !== 'byron') {
         const releaseBufferLock = await acquireBufferLock()
 
         try {
-          if (generation !== clientGeneration) {
-            // A newer client took over, don't aggregate anything and don't ask this
-            // client's closed socket for more blocks
+          if (generation !== connectionGeneration) {
             return
           }
 
@@ -401,17 +396,21 @@ export const startChainSyncClient = async () => {
           releaseBufferLock()
         }
       }
-      nextBlock()
+      if (generation === connectionGeneration) nextBlock()
     },
 
     async rollBackward(response, nextBlock) {
+      if (generation !== connectionGeneration) {
+        return
+      }
       const releaseBufferLock = await acquireBufferLock()
 
       try {
-        if (generation !== clientGeneration) {
+        if (generation !== connectionGeneration) {
           return
         }
 
+        // The first message after every resume is a rollback to the resume point
         logger.trace({point: response.point}, 'Roll backward')
         await writeBuffersIfNecessary({
           threshold: 1,
@@ -422,14 +421,15 @@ export const startChainSyncClient = async () => {
         releaseBufferLock()
       }
 
-      nextBlock()
+      if (generation === connectionGeneration) nextBlock()
     },
   })
 
-  // Rollback to latest intersect first
+  // Rollback to latest intersect first. The intersect is behind the DB tip, so it never
+  // skips a block. It is computed again on every connection, as the DB tip moves.
   let intersect = await findIntersect()
   // Hold the lock so that the rollback doesn't run in parallel with a write from a handler
-  // of the superseded client, which would resurrect the rolled back blocks
+  // of the closed connection, which would resurrect the rolled back blocks
   const releaseBufferLockForRollback = await acquireBufferLock()
 
   try {
@@ -448,10 +448,11 @@ export const startChainSyncClient = async () => {
   }
   logger.info({intersect}, 'Ogmios - resuming chainSyncClient')
   await chainSyncClient.resume([intersect], 100)
+}
 
-  if (!hasCloseEventListener) {
-    // Restart chainSyncClient on context close
-    context.socket.addEventListener('close', () => startChainSyncClient())
-    hasCloseEventListener = true
-  }
+export const chainSyncOgmiosClient: OgmiosClient = {
+  closeFn: () => {
+    connectionGeneration++
+  },
+  initializeFn: initializeChainSyncClient,
 }

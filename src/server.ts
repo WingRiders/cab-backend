@@ -38,11 +38,12 @@ export const baseApp = new Elysia()
     // Check sync status
     const tipToSlot = (tip: Point | 'origin') => (tip === 'origin' ? originPoint.slot : tip.slot)
     const lastBlockPromise = getLastBlock()
-    const networkTipPromise = getNetworkTip()
+    // Don't wait for a reconnect, a probe must get the 503 before its own timeout
+    const networkTipPromise = getNetworkTip({waitForConnection: false})
     const [networkSlot, ledgerSlot, lastBlockSlot, isDbConnected, isOgmiosConnected] =
       await Promise.all([
         networkTipPromise.then(tipToSlot).catch(() => 0),
-        getLedgerTip()
+        getLedgerTip({waitForConnection: false})
           .then(tipToSlot)
           .catch(() => 0),
         lastBlockPromise.then((block) => (block ? block.slot : 0)).catch(() => 0),

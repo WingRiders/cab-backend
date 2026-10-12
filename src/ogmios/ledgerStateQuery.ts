@@ -1,24 +1,32 @@
-import {createLedgerStateQueryClient} from '@cardano-ogmios/client'
+import {type LedgerStateQuery, createLedgerStateQueryClient} from '@cardano-ogmios/client'
 import type {Address, ProtocolParameters, TransactionOutputReference} from '@cardano-ogmios/schema'
-import {getContext, withClient} from './ogmios'
+import {type OgmiosClient, waitForOgmiosConnection} from './ogmios'
 
-let ledgerStateQueryClient: Awaited<ReturnType<typeof createLedgerStateQueryClient>> | undefined
-const getLedgerStateQueryClient = async () => {
-  // If the underlying socket connection has terminated recreate the client
-  if (!ledgerStateQueryClient || ledgerStateQueryClient.context.socket.readyState > 1) {
-    ledgerStateQueryClient = await createLedgerStateQueryClient(await getContext())
+let ledgerStateQueryClient: LedgerStateQuery.LedgerStateQueryClient | null = null
+
+export const ledgerStateQueryOgmiosClient: OgmiosClient = {
+  closeFn: () => {
+    ledgerStateQueryClient = null
+  },
+  initializeFn: async (context) => {
+    ledgerStateQueryClient = await createLedgerStateQueryClient(context)
+  },
+}
+
+const getLedgerStateQueryClient = async ({waitForConnection = true} = {}) => {
+  if (waitForConnection) await waitForOgmiosConnection()
+  if (!ledgerStateQueryClient) {
+    throw new Error('Ogmios ledger state query client is not initialized')
   }
   return ledgerStateQueryClient
 }
 
-const queryClient = withClient(getLedgerStateQueryClient)
-
 export const getUTxOs = async (
   filter: {addresses: Address[]} | {outputReferences: TransactionOutputReference[]},
-) => queryClient((q) => q.utxo(filter))
+) => (await getLedgerStateQueryClient()).utxo(filter)
 
 export const getRewardAccountSummary = async (stakeKeyHash: string) =>
-  queryClient((q) => q.rewardAccountSummaries({keys: [stakeKeyHash]}))
+  (await getLedgerStateQueryClient()).rewardAccountSummaries({keys: [stakeKeyHash]})
 
 let cachedProtocolParams: {epoch: number; protocolParams: ProtocolParameters} | undefined
 export const protocolParameters = async () => {
@@ -36,6 +44,8 @@ export const protocolParameters = async () => {
   return cachedProtocolParams.protocolParams
 }
 
-export const getNetworkTip = () => queryClient((q) => q.networkTip())
+export const getNetworkTip = async (options?: {waitForConnection?: boolean}) =>
+  (await getLedgerStateQueryClient(options)).networkTip()
 
-export const getLedgerTip = () => queryClient((q) => q.ledgerTip())
+export const getLedgerTip = async (options?: {waitForConnection?: boolean}) =>
+  (await getLedgerStateQueryClient(options)).ledgerTip()
