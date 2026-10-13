@@ -55,8 +55,7 @@ const processBlock = async (block: BlockPraos) => {
       return
     }
 
-    let outputIndex = 0
-    for (const output of tx.outputs ?? []) {
+    for (const [outputIndex, output] of (tx.outputs ?? []).entries()) {
       if (!isShelleyAddress(output.address)) {
         // We don't aggregate Byron addresses
         continue
@@ -83,8 +82,6 @@ const processBlock = async (block: BlockPraos) => {
       if (config.FIXUP_MISSING_BLOCKS.size > 0) {
         fixupUtxoIds.add(utxoId)
       }
-
-      outputIndex += 1
     }
 
     const spentTxOutputs = tx.inputs.map((input) => ({
