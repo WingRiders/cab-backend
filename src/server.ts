@@ -1,6 +1,5 @@
 import type {Point} from '@cardano-ogmios/schema'
 import cors from '@elysiajs/cors'
-import type {Serve} from 'bun'
 import {Elysia, mapResponse, t} from 'elysia'
 import JSONbig from 'json-bigint'
 import {
@@ -74,7 +73,7 @@ export const baseApp = new Elysia()
 export const app = new Elysia({
   serve: {
     idleTimeout: 60, // Set request timeout to 1 minute
-  } as Serve & {idleTimeout: number}, // Bun.serve does not officially expose idleTimeout option
+  },
 })
 
   // Reuse baseApp for /healthstatus

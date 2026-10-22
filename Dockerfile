@@ -1,4 +1,4 @@
-FROM oven/bun:alpine as base
+FROM oven/bun:1.4.4-alpine as base
 
 # install dependencies into temp directory
 # this will cache them and speed up future builds
@@ -22,7 +22,7 @@ COPY healthcheck.sh /usr/src/app/healthcheck.sh
 HEALTHCHECK --start-period=10s --interval=30s --retries=10 CMD /usr/src/app/healthcheck.sh
 
 # Add the RDS certificate to the system
-RUN apk add --no-cache ca-certificates=20260909-r0
+RUN apk add --no-cache ca-certificates=20261020-r0
 COPY ca-certificates/rds-global-bundle.pem /usr/local/share/ca-certificates/rds.crt
 RUN update-ca-certificates
 
